@@ -258,6 +258,21 @@ export function applyThemeToDocument(theme: AppTheme) {
   const root = document.documentElement;
   root.classList.remove("theme-white", "theme-dark", "theme-default");
   root.classList.add(`theme-${theme}`);
+  root.setAttribute("data-theme", theme);
+
+  const appRoot = document.getElementById("auraspace-app-root");
+  if (appRoot) {
+    appRoot.classList.remove("theme-white", "theme-dark", "theme-default");
+    appRoot.classList.add(`theme-${theme}`);
+    appRoot.setAttribute("data-theme", theme);
+  }
+}
+
+if (typeof window !== "undefined") {
+  try {
+    const initialTheme = getStoredTheme();
+    applyThemeToDocument(initialTheme);
+  } catch (e) {}
 }
 
 function getUserStorageKey(user: UserAccount | null): string {

@@ -1,1 +1,180 @@
 @import "tailwindcss";
+
+/* -------------------------------------------------------------------------- */
+/* THEME ENGINE: White (Minimalist Atelier) & Dark (Onyx Studio) Modes        */
+/* -------------------------------------------------------------------------- */
+
+/* 1. LIGHT THEME (White / Minimalist Atelier) */
+html.theme-white,
+body.theme-white,
+[data-theme="white"],
+.theme-white {
+  color-scheme: light;
+  background-color: #f7f6f2 !important;
+  color: #1c1917 !important;
+}
+
+.theme-white #auraspace-app-root {
+  background-color: #f7f6f2 !important;
+  color: #1c1917 !important;
+}
+
+/* Surfaces & Containers */
+.theme-white .bg-stone-950 {
+  background-color: #ffffff !important;
+}
+.theme-white .bg-stone-950\/90,
+.theme-white .bg-stone-950\/80,
+.theme-white .bg-stone-950\/70,
+.theme-white .bg-stone-950\/60,
+.theme-white .bg-stone-950\/40 {
+  background-color: #f5f4ef !important;
+}
+.theme-white .bg-stone-900,
+.theme-white .bg-stone-900\/95,
+.theme-white .bg-stone-900\/90,
+.theme-white .bg-stone-900\/80,
+.theme-white .bg-stone-900\/60 {
+  background-color: #faf9f6 !important;
+}
+.theme-white .bg-stone-850 {
+  background-color: #f0eee8 !important;
+}
+.theme-white .bg-stone-800,
+.theme-white .bg-stone-800\/90,
+.theme-white .bg-stone-800\/80,
+.theme-white .bg-stone-800\/60,
+.theme-white .bg-stone-800\/50,
+.theme-white .bg-stone-800\/40 {
+  background-color: #eae7df !important;
+}
+.theme-white .bg-stone-700,
+.theme-white .bg-stone-700\/80 {
+  background-color: #ded9cd !important;
+}
+.theme-white .bg-black {
+  background-color: #f4f2eb !important;
+}
+.theme-white .bg-zinc-950 {
+  background-color: #ffffff !important;
+}
+.theme-white .bg-zinc-900 {
+  background-color: #faf9f6 !important;
+}
+.theme-white .bg-zinc-800 {
+  background-color: #eae7df !important;
+}
+
+/* Modals & Dialogs */
+.theme-white [role="dialog"],
+.theme-white .modal-surface {
+  background-color: #ffffff !important;
+  border-color: #e5e0d8 !important;
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.15) !important;
+}
+
+/* Borders */
+.theme-white .border-stone-800,
+.theme-white .border-stone-800\/80,
+.theme-white .border-stone-800\/60,
+.theme-white .border-stone-800\/40,
+.theme-white .border-stone-700,
+.theme-white .border-stone-700\/80,
+.theme-white .border-stone-600,
+.theme-white .border-zinc-800 {
+  border-color: #e5e0d8 !important;
+}
+
+/* Typography & High-Contrast Readability */
+.theme-white .text-stone-100,
+.theme-white .text-stone-200 {
+  color: #1c1917 !important;
+}
+.theme-white .text-stone-300 {
+  color: #292524 !important;
+}
+.theme-white .text-stone-400 {
+  color: #57534e !important;
+}
+.theme-white .text-stone-500 {
+  color: #78716c !important;
+}
+.theme-white .text-stone-600 {
+  color: #8c857b !important;
+}
+
+/* Text white overrides (unless in dark badges / primary buttons) */
+.theme-white :not(.bg-amber-500):not(.bg-rose-500):not(.bg-emerald-500):not(.bg-indigo-500):not(.bg-sky-500):not(.bg-stone-900) > .text-white,
+.theme-white h1.text-white,
+.theme-white h2.text-white,
+.theme-white h3.text-white,
+.theme-white h4.text-white,
+.theme-white span.text-white:not(.badge-text),
+.theme-white p.text-white {
+  color: #18181b !important;
+}
+
+/* Hover States in Light Mode */
+.theme-white .hover\:bg-stone-800:hover {
+  background-color: #eae7df !important;
+}
+.theme-white .hover\:bg-stone-700:hover {
+  background-color: #e2ded5 !important;
+}
+.theme-white .hover\:text-white:hover {
+  color: #0c0a09 !important;
+}
+.theme-white .hover\:text-stone-200:hover {
+  color: #1c1917 !important;
+}
+.theme-white .hover\:text-stone-300:hover {
+  color: #292524 !important;
+}
+
+/* Input Fields & Textareas */
+.theme-white input:not([type="color"]):not([type="checkbox"]):not([type="range"]),
+.theme-white textarea,
+.theme-white select {
+  background-color: #ffffff !important;
+  border-color: #d6d3cc !important;
+  color: #1c1917 !important;
+}
+.theme-white input::placeholder,
+.theme-white textarea::placeholder {
+  color: #8c857b !important;
+}
+
+/* Empty Screen & Canvas Overlays */
+.theme-white #canvas-empty-black-screen {
+  background-color: transparent !important;
+}
+.theme-white #canvas-empty-black-screen .bg-stone-900 {
+  background-color: #ffffff !important;
+  border-color: #e5e0d8 !important;
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.08) !important;
+}
+
+/* 2. ONYX DARK THEME */
+html.theme-dark,
+body.theme-dark,
+[data-theme="dark"],
+.theme-dark {
+  color-scheme: dark;
+  background-color: #09090b !important;
+  color: #f4f4f5 !important;
+}
+.theme-dark #auraspace-app-root {
+  background-color: #09090b !important;
+}
+.theme-dark .bg-stone-950 {
+  background-color: #09090b !important;
+}
+.theme-dark .bg-stone-900 {
+  background-color: #121215 !important;
+}
+.theme-dark .bg-stone-800 {
+  background-color: #1c1c22 !important;
+}
+.theme-dark .border-stone-800 {
+  border-color: #27272f !important;
+}

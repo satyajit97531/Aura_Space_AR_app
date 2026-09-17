@@ -11,6 +11,7 @@ export const EditorCanvas: React.FC = () => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
   const {
+    theme,
     roomWidth,
     roomLength,
     roomHeight,
@@ -255,6 +256,17 @@ export const EditorCanvas: React.FC = () => {
       renderer.dispose();
     };
   }, []);
+
+  // Dynamic Scene Background Sync with App Theme (Light White Atelier / Onyx Dark / Architectural Slate)
+  useEffect(() => {
+    if (!sceneRef.current) return;
+    const isLight = theme === "white";
+    const bgHex = isLight ? "#F4F2EB" : theme === "dark" ? "#09090B" : "#18181B";
+    sceneRef.current.background = new THREE.Color(bgHex);
+    if (rendererRef.current) {
+      rendererRef.current.setClearColor(new THREE.Color(bgHex), 1);
+    }
+  }, [theme]);
 
   // 3. Camera View Mode Toggles (Perspective, Isometric, 2D Blueprint)
   useEffect(() => {

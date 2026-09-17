@@ -12,11 +12,12 @@ import { MobileARView } from "./components/ar/MobileARView";
 import { AuthModal } from "./components/auth/AuthModal";
 import { SettingsModal } from "./components/modals/SettingsModal";
 import { ProfileModal } from "./components/modals/ProfileModal";
-import { useStore } from "./store/useStore";
+import { useStore, applyThemeToDocument } from "./store/useStore";
 import { Layers, Plus, FolderOpen } from "lucide-react";
 
 export default function App() {
   const {
+    theme,
     undo,
     redo,
     selectedObjectId,
@@ -32,6 +33,7 @@ export default function App() {
     isProfileModalOpen,
     setIsProfileModalOpen,
     profileModalTab,
+    openPublicProfileTab,
   } = useStore();
 
   const [isAIOpen, setIsAIOpen] = useState(false);
@@ -39,10 +41,27 @@ export default function App() {
   const [isRoomSettingsOpen, setIsRoomSettingsOpen] = useState(false);
   const [isNewCanvasOpen, setIsNewCanvasOpen] = useState(false);
 
-  // Initial load of saved projects
+  // Initial load of saved projects and theme application
   useEffect(() => {
     fetchSavedProjects();
-  }, [fetchSavedProjects]);
+    applyThemeToDocument(theme);
+  }, [fetchSavedProjects, theme]);
+
+  // Handle shared URL links (e.g. ?profile=username, ?tab=gallery, ?blueprint=id)
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    try {
+      const params = new URLSearchParams(window.location.search);
+      const profile = params.get("profile");
+      const tab = params.get("tab");
+      const gallery = params.get("gallery");
+      if (profile || tab === "gallery" || gallery === "community") {
+        openPublicProfileTab("gallery");
+      } else if (tab === "profile") {
+        openPublicProfileTab("profile");
+      }
+    } catch (e) {}
+  }, [openPublicProfileTab]);
 
   // Keyboard Shortcuts & Custom Event Handlers (trigger-undo / trigger-redo)
   useEffect(() => {
@@ -111,7 +130,13 @@ export default function App() {
   return (
     <div
       id="auraspace-app-root"
-      className="flex flex-col w-screen h-screen overflow-hidden bg-stone-950 text-stone-100 font-sans antialiased select-none"
+      className={`flex flex-col w-screen h-screen overflow-hidden font-sans antialiased select-none transition-colors duration-200 ${
+        theme === "white"
+          ? "theme-white bg-[#F7F6F2] text-stone-900"
+          : theme === "dark"
+          ? "theme-dark bg-[#09090B] text-zinc-100"
+          : "theme-default bg-stone-950 text-stone-100"
+      }`}
     >
       {/* 1. Mobile AR Viewport (Overlays screen when active) */}
       {isARActive ? (

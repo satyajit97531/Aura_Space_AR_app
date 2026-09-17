@@ -3,6 +3,7 @@ import { useStore } from "../../store/useStore";
 import { ACHIEVEMENTS_LIST } from "../../data/achievements";
 import { formatDistance, formatArea } from "../../utils/units";
 import { AuraProject, ProjectComment } from "../../types";
+import { ShareModal, ShareModalData } from "./ShareModal";
 import {
   X,
   User,
@@ -77,6 +78,47 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
   const [newCommentText, setNewCommentText] = useState<{ [projectId: string]: string }>({});
   const [commentSubmitting, setCommentSubmitting] = useState<string | null>(null);
   const [localLikeAnim, setLocalLikeAnim] = useState<{ [projectId: string]: boolean }>({});
+
+  // Share profile and blueprints state
+  const [shareModalData, setShareModalData] = useState<ShareModalData | null>(null);
+  const [isShareModalOpen, setIsShareModalOpen] = useState(false);
+
+  const handleSharePublicProfile = () => {
+    if (typeof window === "undefined") return;
+    const profileHandle = username || currentUser?.username || currentUser?.email?.split("@")[0] || "designer";
+    const origin = window.location.origin;
+    const path = window.location.pathname;
+    const shareUrl = `${origin}${path}?profile=${encodeURIComponent(profileHandle)}&tab=gallery`;
+
+    setShareModalData({
+      type: "profile",
+      title: displayName || currentUser?.name || `@${profileHandle}`,
+      subtitle: bio ? (bio.length > 80 ? bio.slice(0, 80) + "..." : bio) : "AuraSpace Public 3D Designer Portfolio",
+      username: profileHandle,
+      avatarUrl: avatarUrl || currentUser?.avatarUrl,
+      url: shareUrl,
+    });
+    setIsShareModalOpen(true);
+  };
+
+  const handleShareProject = (project: AuraProject) => {
+    if (typeof window === "undefined") return;
+    const origin = window.location.origin;
+    const path = window.location.pathname;
+    const projectId = project.id || "";
+    const shareUrl = `${origin}${path}?blueprint=${encodeURIComponent(projectId)}&tab=gallery`;
+    const author = project.userName || (project.userEmail ? project.userEmail.split("@")[0] : "designer");
+
+    setShareModalData({
+      type: "project",
+      title: project.name,
+      subtitle: `3D Blueprint by @${author}`,
+      username: author,
+      url: shareUrl,
+      description: project.notes,
+    });
+    setIsShareModalOpen(true);
+  };
 
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
@@ -346,6 +388,14 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
               <div className="flex items-center gap-2">
                 <h2 className="text-base font-bold text-white">{displayName || "Designer Profile"}</h2>
                 <span className="text-xs text-amber-400 font-mono">@{username || currentUser.email.split("@")[0]}</span>
+                <button
+                  id="profile-header-share-btn"
+                  onClick={handleSharePublicProfile}
+                  title="Share your public designer portfolio"
+                  className="p-1 rounded-md text-stone-400 hover:text-amber-400 hover:bg-stone-800 transition-colors ml-1"
+                >
+                  <Share2 className="w-3.5 h-3.5" />
+                </button>
               </div>
               <p className="text-[11px] text-stone-400">Manage public persona, community gallery, & badges</p>
             </div>
@@ -702,6 +752,17 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
                 >
                   <RefreshCw className={`w-3.5 h-3.5 ${isLoadingCommunity ? "animate-spin text-amber-400" : ""}`} />
                 </button>
+
+                {/* Share Public Profile Button */}
+                <button
+                  id="gallery-share-profile-btn"
+                  onClick={handleSharePublicProfile}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-stone-950 font-bold text-xs transition-all shadow-md shadow-amber-500/20 active:scale-95 shrink-0"
+                  title="Share your public profile and 3D blueprints via WhatsApp, Link, etc."
+                >
+                  <Share2 className="w-3.5 h-3.5 stroke-[2.5]" />
+                  <span>Share Profile</span>
+                </button>
               </div>
             </div>
 
@@ -847,6 +908,16 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
                               </div>
 
                               <div className="flex items-center gap-2">
+                                {/* Share Blueprint Button */}
+                                <button
+                                  id={`comm-share-btn-${project.id}`}
+                                  onClick={() => handleShareProject(project)}
+                                  title="Share this 3D blueprint to WhatsApp or copy link"
+                                  className="p-1.5 rounded-lg text-stone-400 hover:text-amber-400 hover:bg-stone-800 transition-colors"
+                                >
+                                  <Share2 className="w-3.5 h-3.5" />
+                                </button>
+
                                 {/* Copy / Remix Button */}
                                 <button
                                   id={`copy-remix-btn-${project.id}`}
@@ -1108,6 +1179,16 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
                               </div>
 
                               <div className="flex items-center gap-2">
+                                {/* Share Blueprint Button */}
+                                <button
+                                  id={`my-share-btn-${project.id}`}
+                                  onClick={() => handleShareProject(project)}
+                                  title="Share this 3D blueprint to WhatsApp or copy link"
+                                  className="p-1.5 rounded-lg text-stone-400 hover:text-amber-400 hover:bg-stone-800 transition-colors"
+                                >
+                                  <Share2 className="w-3.5 h-3.5" />
+                                </button>
+
                                 {/* Duplicate / Copy Blueprint */}
                                 <button
                                   id={`duplicate-btn-${project.id}`}
@@ -1328,6 +1409,13 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
           </button>
         </div>
       </div>
+
+      {/* Share Profile & Blueprint Modal */}
+      <ShareModal
+        isOpen={isShareModalOpen}
+        onClose={() => setIsShareModalOpen(false)}
+        data={shareModalData}
+      />
     </div>
   );
 };

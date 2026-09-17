@@ -1,0 +1,6 @@
+{
+  "name": "AuraSpace",
+  "description": "Spatial design and Augmented Reality interior planning application with procedural 3D furniture and AI assistance",
+  "requestFramePermissions": ["camera"],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

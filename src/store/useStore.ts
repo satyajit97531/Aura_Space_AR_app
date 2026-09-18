@@ -260,6 +260,12 @@ export function applyThemeToDocument(theme: AppTheme) {
   root.classList.add(`theme-${theme}`);
   root.setAttribute("data-theme", theme);
 
+  if (document.body) {
+    document.body.classList.remove("theme-white", "theme-dark", "theme-default");
+    document.body.classList.add(`theme-${theme}`);
+    document.body.setAttribute("data-theme", theme);
+  }
+
   const appRoot = document.getElementById("auraspace-app-root");
   if (appRoot) {
     appRoot.classList.remove("theme-white", "theme-dark", "theme-default");

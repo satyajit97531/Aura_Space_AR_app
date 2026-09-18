@@ -29,6 +29,7 @@ import {
   RefreshCw,
   AlertCircle,
   ShieldCheck,
+  MessageCircle,
 } from "lucide-react";
 
 interface ProfileModalProps {
@@ -139,6 +140,28 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
     }
   }, [initialTab, isOpen]);
 
+  // Fetch community projects across all designers from MongoDB
+  const fetchCommunityProjects = async () => {
+    setIsLoadingCommunity(true);
+    try {
+      const res = await fetch("/api/gallery");
+      const data = await res.json();
+      if (data.success && Array.isArray(data.projects)) {
+        setCommunityProjects(data.projects);
+      }
+    } catch (e) {
+      console.warn("Could not fetch community gallery:", e);
+    } finally {
+      setIsLoadingCommunity(false);
+    }
+  };
+
+  useEffect(() => {
+    if (isOpen && activeTab === "gallery") {
+      fetchCommunityProjects();
+    }
+  }, [isOpen, activeTab]);
+
   if (!isOpen) return null;
 
   // If user is not logged in, prompt sign in
@@ -146,12 +169,12 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
     return (
       <div
         id="profile-modal-backdrop-guest"
-        className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm animate-in fade-in duration-150"
+        className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/75 backdrop-blur-sm animate-in fade-in duration-150"
         onClick={onClose}
       >
         <div
           id="profile-modal-guest-card"
-          className="w-full max-w-md bg-stone-900 border border-stone-800 rounded-2xl shadow-2xl p-6 text-center text-stone-100 flex flex-col items-center"
+          className="w-full max-w-md bg-stone-900 border border-stone-800 rounded-2xl shadow-2xl p-5 sm:p-6 text-center text-stone-100 flex flex-col items-center"
           onClick={(e) => e.stopPropagation()}
         >
           <div className="w-14 h-14 rounded-2xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-400 mb-4">
@@ -251,28 +274,6 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
     }
   };
 
-  // Fetch community projects across all designers from MongoDB
-  const fetchCommunityProjects = async () => {
-    setIsLoadingCommunity(true);
-    try {
-      const res = await fetch("/api/gallery");
-      const data = await res.json();
-      if (data.success && Array.isArray(data.projects)) {
-        setCommunityProjects(data.projects);
-      }
-    } catch (e) {
-      console.warn("Could not fetch community gallery:", e);
-    } finally {
-      setIsLoadingCommunity(false);
-    }
-  };
-
-  useEffect(() => {
-    if (isOpen && activeTab === "gallery") {
-      fetchCommunityProjects();
-    }
-  }, [isOpen, activeTab]);
-
   // Copy and remix project to user's account (protecting original from any mutation)
   const handleCopyAndRemix = async (project: AuraProject) => {
     setForkingId(project.id);
@@ -368,66 +369,76 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
         onClick={(e) => e.stopPropagation()}
       >
         {/* Top Header & Tab Navigation */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between px-6 py-4 border-b border-stone-800 bg-stone-900/95 gap-3">
-          <div className="flex items-center gap-3">
-            <div className="relative">
-              {avatarUrl ? (
-                <img
-                  src={avatarUrl}
-                  alt={displayName}
-                  className="w-10 h-10 rounded-xl object-cover border border-amber-500/40 shadow-sm"
-                  referrerPolicy="no-referrer"
-                />
-              ) : (
-                <div className="w-10 h-10 rounded-xl bg-amber-500 text-stone-950 font-bold text-base flex items-center justify-center shadow-sm">
-                  {displayName ? displayName.charAt(0).toUpperCase() : "U"}
-                </div>
-              )}
-            </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <h2 className="text-base font-bold text-white">{displayName || "Designer Profile"}</h2>
-                <span className="text-xs text-amber-400 font-mono">@{username || currentUser.email.split("@")[0]}</span>
-                <button
-                  id="profile-header-share-btn"
-                  onClick={handleSharePublicProfile}
-                  title="Share your public designer portfolio"
-                  className="p-1 rounded-md text-stone-400 hover:text-amber-400 hover:bg-stone-800 transition-colors ml-1"
-                >
-                  <Share2 className="w-3.5 h-3.5" />
-                </button>
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between px-4 sm:px-6 py-3 sm:py-4 border-b border-stone-800 bg-stone-900/95 gap-3">
+          <div className="flex items-center justify-between sm:justify-start gap-3 w-full sm:w-auto">
+            <div className="flex items-center gap-3 min-w-0">
+              <div className="relative shrink-0">
+                {avatarUrl ? (
+                  <img
+                    src={avatarUrl}
+                    alt={displayName}
+                    className="w-10 h-10 rounded-xl object-cover border border-amber-500/40 shadow-sm"
+                    referrerPolicy="no-referrer"
+                  />
+                ) : (
+                  <div className="w-10 h-10 rounded-xl bg-amber-500 text-stone-950 font-bold text-base flex items-center justify-center shadow-sm">
+                    {displayName ? displayName.charAt(0).toUpperCase() : "U"}
+                  </div>
+                )}
               </div>
-              <p className="text-[11px] text-stone-400">Manage public persona, community gallery, & badges</p>
+              <div className="min-w-0">
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  <h2 className="text-sm sm:text-base font-bold text-white truncate max-w-[140px] sm:max-w-[200px]">{displayName || "Designer Profile"}</h2>
+                  <span className="text-xs text-amber-400 font-mono">@{username || currentUser.email.split("@")[0]}</span>
+                  <button
+                    id="profile-header-share-btn"
+                    onClick={handleSharePublicProfile}
+                    title="Share your public designer portfolio"
+                    className="p-1 rounded-md text-stone-400 hover:text-amber-400 hover:bg-stone-800 transition-colors"
+                  >
+                    <Share2 className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+                <p className="text-[11px] text-stone-400 truncate">Manage public persona, community gallery, & badges</p>
+              </div>
             </div>
+
+            <button
+              id="profile-modal-close-mobile-btn"
+              onClick={onClose}
+              className="sm:hidden p-2 rounded-lg text-stone-400 hover:text-white hover:bg-stone-800 transition-colors shrink-0"
+            >
+              <X className="w-4 h-4" />
+            </button>
           </div>
 
-          <div className="flex items-center gap-1 sm:gap-2">
+          <div className="flex items-center gap-1 sm:gap-2 w-full sm:w-auto justify-between sm:justify-end">
             {/* Tabs */}
-            <div className="flex bg-stone-950/80 p-1 rounded-xl border border-stone-800">
+            <div className="flex bg-stone-950/80 p-1 rounded-xl border border-stone-800 overflow-x-auto no-scrollbar max-w-full">
               <button
                 id="tab-btn-profile"
                 onClick={() => setActiveTab("profile")}
-                className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all flex items-center gap-1.5 ${
+                className={`px-2.5 sm:px-3 py-1.5 rounded-lg text-xs font-medium transition-all flex items-center gap-1.5 whitespace-nowrap ${
                   activeTab === "profile"
                     ? "bg-amber-500 text-stone-950 font-semibold shadow-sm"
                     : "text-stone-400 hover:text-stone-200"
                 }`}
               >
                 <User className="w-3.5 h-3.5" />
-                <span>Public Profile</span>
+                <span>Profile</span>
               </button>
 
               <button
                 id="tab-btn-gallery"
                 onClick={() => setActiveTab("gallery")}
-                className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all flex items-center gap-1.5 ${
+                className={`px-2.5 sm:px-3 py-1.5 rounded-lg text-xs font-medium transition-all flex items-center gap-1.5 whitespace-nowrap ${
                   activeTab === "gallery"
                     ? "bg-amber-500 text-stone-950 font-semibold shadow-sm"
                     : "text-stone-400 hover:text-stone-200"
                 }`}
               >
                 <Globe className="w-3.5 h-3.5" />
-                <span>My Public Gallery</span>
+                <span>Gallery</span>
                 {publicProjects.length > 0 && (
                   <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-bold ${
                     activeTab === "gallery" ? "bg-stone-950 text-amber-400" : "bg-stone-800 text-stone-300"
@@ -440,14 +451,14 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
               <button
                 id="tab-btn-achievements"
                 onClick={() => setActiveTab("achievements")}
-                className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all flex items-center gap-1.5 ${
+                className={`px-2.5 sm:px-3 py-1.5 rounded-lg text-xs font-medium transition-all flex items-center gap-1.5 whitespace-nowrap ${
                   activeTab === "achievements"
                     ? "bg-amber-500 text-stone-950 font-semibold shadow-sm"
                     : "text-stone-400 hover:text-stone-200"
                 }`}
               >
                 <Trophy className="w-3.5 h-3.5" />
-                <span>Achievements</span>
+                <span>Badges</span>
                 {userBadges.length > 0 && (
                   <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-bold ${
                     activeTab === "achievements" ? "bg-stone-950 text-amber-400" : "bg-stone-800 text-stone-300"
@@ -461,7 +472,7 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
             <button
               id="profile-modal-close-btn"
               onClick={onClose}
-              className="p-1.5 rounded-lg text-stone-400 hover:text-white hover:bg-stone-800 transition-colors ml-1"
+              className="hidden sm:flex p-1.5 rounded-lg text-stone-400 hover:text-white hover:bg-stone-800 transition-colors ml-1"
             >
               <X className="w-4 h-4" />
             </button>
@@ -700,9 +711,9 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
                 </p>
               </div>
 
-              {/* Segmented Scope Controller */}
-              <div className="flex items-center gap-2 self-start sm:self-auto">
-                <div className="flex bg-stone-950 p-1 rounded-xl border border-stone-800 text-xs">
+              {/* Segmented Scope Controller & Actions */}
+              <div className="flex flex-wrap items-center gap-2 self-start sm:self-auto">
+                <div className="flex bg-stone-950 p-1 rounded-xl border border-stone-800 text-xs shrink-0">
                   <button
                     id="scope-btn-community"
                     onClick={() => {
@@ -748,7 +759,7 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
                 <button
                   onClick={fetchCommunityProjects}
                   title="Refresh Community Feed"
-                  className="p-2 rounded-xl bg-stone-950 border border-stone-800 text-stone-400 hover:text-white hover:border-stone-700 transition-all"
+                  className="p-2 rounded-xl bg-stone-950 border border-stone-800 text-stone-400 hover:text-white hover:border-stone-700 transition-all shrink-0"
                 >
                   <RefreshCw className={`w-3.5 h-3.5 ${isLoadingCommunity ? "animate-spin text-amber-400" : ""}`} />
                 </button>
@@ -757,11 +768,42 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
                 <button
                   id="gallery-share-profile-btn"
                   onClick={handleSharePublicProfile}
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-stone-950 font-bold text-xs transition-all shadow-md shadow-amber-500/20 active:scale-95 shrink-0"
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-stone-950 font-bold text-xs transition-all shadow-md shadow-emerald-500/20 active:scale-95 shrink-0"
                   title="Share your public profile and 3D blueprints via WhatsApp, Link, etc."
                 >
-                  <Share2 className="w-3.5 h-3.5 stroke-[2.5]" />
+                  <MessageCircle className="w-3.5 h-3.5 fill-stone-950" />
                   <span>Share Profile</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Dedicated Public Profile & Portfolio Share Banner */}
+            <div className="p-3.5 sm:p-4 rounded-2xl bg-gradient-to-r from-emerald-500/15 via-amber-500/10 to-stone-950/60 border border-emerald-500/30 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-md">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-emerald-500/20 border border-emerald-500/40 text-emerald-400 flex items-center justify-center shrink-0">
+                  <Share2 className="w-5 h-5 text-emerald-400" />
+                </div>
+                <div>
+                  <h4 className="text-xs sm:text-sm font-bold text-white flex items-center gap-2">
+                    <span>Share Your Public Profile & 3D Blueprints</span>
+                    <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 font-bold border border-emerald-500/30">
+                      WhatsApp & Link
+                    </span>
+                  </h4>
+                  <p className="text-[11px] text-stone-300 leading-snug">
+                    Send your public spatial portfolio to clients, teammates, or friends on WhatsApp, social platforms, or via direct link.
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2 w-full sm:w-auto shrink-0">
+                <button
+                  id="gallery-whatsapp-share-direct-btn"
+                  onClick={handleSharePublicProfile}
+                  className="flex-1 sm:flex-initial px-4 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-stone-950 font-bold text-xs transition-all shadow-md shadow-emerald-500/25 active:scale-95 flex items-center justify-center gap-2"
+                >
+                  <MessageCircle className="w-4 h-4 fill-stone-950" />
+                  <span>Send via WhatsApp / Share</span>
                 </button>
               </div>
             </div>

@@ -79,42 +79,47 @@ let dbPromise: Promise<any> | null = null;
 // Permanently drop 'projects' collection and ensure projects are stored directly inside user documents
 async function ensureProjectsCollectionRemoved(db: any) {
   try {
-    const collections = await db.listCollections({ name: "projects" }).toArray();
-    if (collections.length > 0) {
+    const collections = await db.listCollections().toArray();
+    const hasProjects = collections.some((c: any) => c.name === "projects");
+    if (hasProjects) {
       console.log("Removing 'projects' collection from database and consolidating projects into specific user documents...");
-      const existingProjects = await db.collection("projects").find({}).toArray();
-      for (const proj of existingProjects) {
-        if (proj.userId || proj.userEmail) {
-          let userFilter: any = null;
-          if (proj.userId && ObjectId.isValid(proj.userId)) {
-            userFilter = { $or: [{ _id: new ObjectId(proj.userId) }, { id: proj.userId }] };
-          } else if (proj.userId) {
-            userFilter = { id: proj.userId };
-          } else if (proj.userEmail) {
-            userFilter = { email: String(proj.userEmail).toLowerCase() };
-          }
+      try {
+        const existingProjects = await db.collection("projects").find({}).toArray();
+        for (const proj of existingProjects) {
+          if (proj.userId || proj.userEmail) {
+            let userFilter: any = null;
+            if (proj.userId && ObjectId.isValid(proj.userId)) {
+              userFilter = { $or: [{ _id: new ObjectId(proj.userId) }, { id: proj.userId }] };
+            } else if (proj.userId) {
+              userFilter = { id: proj.userId };
+            } else if (proj.userEmail) {
+              userFilter = { email: String(proj.userEmail).toLowerCase() };
+            }
 
-          if (userFilter) {
-            const user = await db.collection("users").findOne(userFilter);
-            if (user) {
-              const pid = proj.id || proj._id?.toString() || proj.clientProjId;
-              const cleanProj = { ...proj, id: pid };
-              delete cleanProj._id;
-              const userProjs: any[] = user.projects || [];
-              const exists = userProjs.some((p: any) => p.id === pid || (p.name && p.name === proj.name));
-              if (!exists) {
-                userProjs.unshift(cleanProj);
-                await db.collection("users").updateOne(
-                  { _id: user._id },
-                  { $set: { projects: userProjs } }
-                );
+            if (userFilter) {
+              const user = await db.collection("users").findOne(userFilter);
+              if (user) {
+                const pid = proj.id || proj._id?.toString() || proj.clientProjId;
+                const cleanProj = { ...proj, id: pid };
+                delete cleanProj._id;
+                const userProjs: any[] = user.projects || [];
+                const exists = userProjs.some((p: any) => p.id === pid || (p.name && p.name === proj.name));
+                if (!exists) {
+                  userProjs.unshift(cleanProj);
+                  await db.collection("users").updateOne(
+                    { _id: user._id },
+                    { $set: { projects: userProjs } }
+                  );
+                }
               }
             }
           }
         }
+      } catch (readErr: any) {
+        console.warn("Could not read projects collection before dropping:", readErr.message);
       }
 
-      // Drop the projects collection permanently
+      // Drop the projects collection permanently from database
       await db.collection("projects").drop();
       console.log("SUCCESS: 'projects' collection has been dropped from database. All projects are stored inside user documents.");
     }

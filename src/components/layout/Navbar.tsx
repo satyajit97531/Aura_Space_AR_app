@@ -25,6 +25,8 @@ import {
   Trophy,
   Lock,
   Copy,
+  Menu,
+  X,
 } from "lucide-react";
 
 interface NavbarProps {
@@ -75,6 +77,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   const [savedNameSuccess, setSavedNameSuccess] = useState(false);
   const [renameError, setRenameError] = useState<string | null>(null);
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
+  const [isMobileToolsOpen, setIsMobileToolsOpen] = useState(false);
 
   // Sync temp name when project changes
   React.useEffect(() => {
@@ -323,12 +326,12 @@ export const Navbar: React.FC<NavbarProps> = ({
           </button>
         </div>
 
-        {/* Grid Snap Toggle */}
+        {/* Grid Snap Toggle (Desktop) */}
         <button
           id="navbar-gridsnap-btn"
           onClick={() => setSnapToGrid(!snapToGrid)}
           title={`Grid Snapping (${snapToGrid ? "Enabled (0.25m)" : "Disabled"})`}
-          className={`p-1.5 rounded-lg border text-xs flex items-center gap-1 transition-colors ${
+          className={`hidden sm:flex p-1.5 rounded-lg border text-xs items-center gap-1 transition-colors ${
             snapToGrid
               ? "bg-amber-500/15 border-amber-500/40 text-amber-300"
               : "bg-stone-800/80 border-stone-700/60 text-stone-400 hover:text-stone-200"
@@ -338,129 +341,116 @@ export const Navbar: React.FC<NavbarProps> = ({
           <span className="hidden xl:inline text-[11px]">0.25m</span>
         </button>
 
-          {/* Room Bounds / Dimensions Config */}
+        {/* Room Bounds / Dimensions Config (Desktop) */}
         <button
           id="navbar-room-settings-btn"
           onClick={onOpenRoomSettings}
           disabled={!isCanvasActive}
           title="Configure Room Dimensions & Palette"
-          className="p-1.5 rounded-lg bg-stone-800/80 hover:bg-stone-700 border border-stone-700/60 text-stone-300 hover:text-white disabled:opacity-30 disabled:hover:bg-stone-800/80 transition-colors flex items-center gap-1 text-xs"
+          className="hidden sm:flex p-1.5 rounded-lg bg-stone-800/80 hover:bg-stone-700 border border-stone-700/60 text-stone-300 hover:text-white disabled:opacity-30 disabled:hover:bg-stone-800/80 transition-colors items-center gap-1 text-xs"
         >
           <Sliders className="w-3.5 h-3.5" />
           <span className="hidden lg:inline text-[11px]">Room</span>
         </button>
       </div>
 
-      {/* Right Side Actions: Mobile Drawer Toggles, New Empty Canvas, Projects, AI Advisor & AR Mode */}
+      {/* Right Side Actions: Desktop Toolset + Mobile Responsive Controls */}
       <div className="flex items-center gap-1 sm:gap-2 shrink-0">
-        {/* Mobile & Tablet Drawer Quick Toggles */}
-        <div className="flex lg:hidden items-center gap-1 bg-stone-950/50 p-0.5 rounded-lg border border-stone-800">
+        {/* Desktop Only Tools (lg+) */}
+        <div className="hidden lg:flex items-center gap-1.5">
+          {/* Create New Empty Project */}
           <button
-            id="mobile-toggle-catalog-btn"
-            onClick={() => window.dispatchEvent(new CustomEvent("toggle-catalog-sidebar"))}
-            title="Toggle Catalog (Left Panel)"
-            className="p-1.5 rounded-md text-stone-400 hover:text-amber-400 hover:bg-stone-800 transition-colors"
+            id="navbar-new-project-btn"
+            onClick={handleCreateNewProject}
+            title="Create New Project (Empty Canvas)"
+            className={`p-1.5 sm:px-2.5 sm:py-1.5 rounded-lg transition-colors flex items-center gap-1 text-xs font-medium ${
+              !isCanvasActive
+                ? "bg-amber-500 hover:bg-amber-400 text-stone-950 font-semibold shadow-md shadow-amber-500/20"
+                : "bg-stone-800/80 hover:bg-stone-700 border border-stone-700/60 text-stone-300 hover:text-white"
+            }`}
           >
-            <PanelLeft className="w-4 h-4" />
+            <Plus className={`w-3.5 h-3.5 ${!isCanvasActive ? "text-stone-950" : "text-amber-400"}`} />
+            <span className="text-[11px]">New Canvas</span>
           </button>
+
+          {/* Random Room (Procedural Placement) */}
+          {isCanvasActive && (
+            <button
+              id="navbar-random-room-btn"
+              onClick={randomizeRealisticRoom}
+              title="Generate Random Layout with Random Furniture"
+              className="p-1.5 sm:px-2.5 sm:py-1.5 rounded-lg bg-stone-800/80 hover:bg-stone-700 border border-stone-700/60 text-stone-300 hover:text-white transition-colors flex items-center gap-1 text-xs"
+            >
+              <Shuffle className="w-3.5 h-3.5 text-amber-400" />
+              <span className="hidden xl:inline text-[11px]">Random Room</span>
+            </button>
+          )}
+
+          {/* Projects / Load */}
           <button
-            id="mobile-toggle-properties-btn"
-            onClick={() => window.dispatchEvent(new CustomEvent("toggle-properties-sidebar"))}
-            title="Toggle Inspector (Right Panel)"
-            className="p-1.5 rounded-md text-stone-400 hover:text-amber-400 hover:bg-stone-800 transition-colors"
+            id="navbar-projects-btn"
+            onClick={onOpenProjects}
+            title="Manage Saved Spatial Plans"
+            className="p-1.5 sm:px-2.5 sm:py-1.5 rounded-lg bg-stone-800/80 hover:bg-stone-700 border border-stone-700/60 text-stone-300 hover:text-white transition-colors flex items-center gap-1 text-xs"
           >
-            <PanelRight className="w-4 h-4" />
+            <FolderOpen className="w-3.5 h-3.5" />
+            <span className="text-[11px]">Projects</span>
+          </button>
+
+          {/* Public Gallery */}
+          <button
+            id="navbar-public-gallery-btn"
+            onClick={() => openPublicProfileTab("gallery")}
+            title="My Public Gallery & Liked Community Designs"
+            className="p-1.5 sm:px-2.5 sm:py-1.5 rounded-lg bg-stone-800/80 hover:bg-stone-700 border border-stone-700/60 text-stone-300 hover:text-white transition-colors flex items-center gap-1 text-xs"
+          >
+            <Globe className="w-3.5 h-3.5 text-amber-400" />
+            <span className="hidden xl:inline text-[11px]">Public Gallery</span>
+          </button>
+
+          {/* Settings Menu (Theme & Units) */}
+          <button
+            id="navbar-settings-btn"
+            onClick={() => setIsSettingsModalOpen(true)}
+            title="Theme (White/Dark/Default) & Spatial Units"
+            className="p-1.5 sm:px-2.5 sm:py-1.5 rounded-lg bg-stone-800/80 hover:bg-stone-700 border border-stone-700/60 text-stone-300 hover:text-white transition-colors flex items-center gap-1 text-xs"
+          >
+            <Settings className="w-3.5 h-3.5 text-amber-400" />
+            <span className="text-[11px]">Settings</span>
+          </button>
+
+          {/* AI Spatial Advisor */}
+          <button
+            id="navbar-ai-assistant-btn"
+            onClick={onOpenAI}
+            className="p-1.5 sm:px-2.5 sm:py-1.5 rounded-lg bg-gradient-to-r from-amber-500/20 to-orange-500/20 hover:from-amber-500/30 hover:to-orange-500/30 border border-amber-500/40 text-amber-300 transition-all flex items-center gap-1 text-xs font-medium shadow-sm"
+          >
+            <Sparkles className="w-3.5 h-3.5 text-amber-400" />
+            <span className="text-[11px]">AI</span>
           </button>
         </div>
 
-        {/* Create New Empty Project */}
-        <button
-          id="navbar-new-project-btn"
-          onClick={handleCreateNewProject}
-          title="Create New Project (Empty Canvas)"
-          className={`p-1.5 sm:px-2.5 sm:py-1.5 rounded-lg transition-colors flex items-center gap-1 text-xs font-medium ${
-            !isCanvasActive
-              ? "bg-amber-500 hover:bg-amber-400 text-stone-950 font-semibold shadow-md shadow-amber-500/20"
-              : "bg-stone-800/80 hover:bg-stone-700 border border-stone-700/60 text-stone-300 hover:text-white"
-          }`}
-        >
-          <Plus className={`w-3.5 h-3.5 ${!isCanvasActive ? "text-stone-950" : "text-amber-400"}`} />
-          <span className="hidden md:inline text-[11px]">New Canvas</span>
-        </button>
-
-        {/* Random Room (Procedural Placement) */}
-        {isCanvasActive && (
-          <button
-            id="navbar-random-room-btn"
-            onClick={randomizeRealisticRoom}
-            title="Generate Random Layout with Random Furniture"
-            className="p-1.5 sm:px-2.5 sm:py-1.5 rounded-lg bg-stone-800/80 hover:bg-stone-700 border border-stone-700/60 text-stone-300 hover:text-white transition-colors flex items-center gap-1 text-xs"
-          >
-            <Shuffle className="w-3.5 h-3.5 text-amber-400" />
-            <span className="hidden xl:inline text-[11px]">Random Room</span>
-          </button>
-        )}
-
-        {/* Projects / Load */}
-        <button
-          id="navbar-projects-btn"
-          onClick={onOpenProjects}
-          title="Manage Saved Spatial Plans"
-          className="p-1.5 sm:px-2.5 sm:py-1.5 rounded-lg bg-stone-800/80 hover:bg-stone-700 border border-stone-700/60 text-stone-300 hover:text-white transition-colors flex items-center gap-1 text-xs"
-        >
-          <FolderOpen className="w-3.5 h-3.5" />
-          <span className="hidden sm:inline text-[11px]">Projects</span>
-        </button>
-
-        {/* Public Gallery */}
-        <button
-          id="navbar-public-gallery-btn"
-          onClick={() => openPublicProfileTab("gallery")}
-          title="My Public Gallery & Liked Community Designs"
-          className="p-1.5 sm:px-2.5 sm:py-1.5 rounded-lg bg-stone-800/80 hover:bg-stone-700 border border-stone-700/60 text-stone-300 hover:text-white transition-colors flex items-center gap-1 text-xs"
-        >
-          <Globe className="w-3.5 h-3.5 text-amber-400" />
-          <span className="hidden xl:inline text-[11px]">Public Gallery</span>
-        </button>
-
-        {/* Settings Menu (Theme & Units) */}
-        <button
-          id="navbar-settings-btn"
-          onClick={() => setIsSettingsModalOpen(true)}
-          title="Theme (White/Dark/Default) & Spatial Units"
-          className="p-1.5 sm:px-2.5 sm:py-1.5 rounded-lg bg-stone-800/80 hover:bg-stone-700 border border-stone-700/60 text-stone-300 hover:text-white transition-colors flex items-center gap-1 text-xs"
-        >
-          <Settings className="w-3.5 h-3.5 text-amber-400" />
-          <span className="hidden lg:inline text-[11px]">Settings</span>
-        </button>
-
-        {/* AI Spatial Advisor */}
-        <button
-          id="navbar-ai-assistant-btn"
-          onClick={onOpenAI}
-          className="p-1.5 sm:px-2.5 sm:py-1.5 rounded-lg bg-gradient-to-r from-amber-500/20 to-orange-500/20 hover:from-amber-500/30 hover:to-orange-500/30 border border-amber-500/40 text-amber-300 transition-all flex items-center gap-1 text-xs font-medium shadow-sm"
-        >
-          <Sparkles className="w-3.5 h-3.5 text-amber-400" />
-          <span className="hidden sm:inline text-[11px]">AI</span>
-        </button>
-
-        {/* AR Mode Trigger Button */}
+        {/* AR Mode Trigger Button (Always visible & prominent) */}
         <button
           id="navbar-ar-mode-btn"
           onClick={handleARClick}
-          className="px-2.5 sm:px-3 py-1.5 rounded-lg bg-amber-500 hover:bg-amber-400 text-stone-950 font-semibold text-xs transition-all flex items-center gap-1 shadow-md shadow-amber-500/20 active:scale-95"
+          className="px-2.5 sm:px-3 py-1.5 rounded-lg bg-amber-500 hover:bg-amber-400 text-stone-950 font-semibold text-xs transition-all flex items-center gap-1 shadow-md shadow-amber-500/20 active:scale-95 shrink-0"
         >
           <Smartphone className="w-3.5 h-3.5" />
-          <span>AR Mode</span>
+          <span className="hidden xs:inline">AR Mode</span>
+          <span className="xs:hidden">AR</span>
         </button>
 
         {/* Account / User Authentication */}
-        <div className="relative">
+        <div className="relative shrink-0">
           {currentUser ? (
             <div className="relative">
               <button
                 id="navbar-account-btn"
-                onClick={() => setIsUserMenuOpen(!isUserMenuOpen)}
+                onClick={() => {
+                  setIsUserMenuOpen(!isUserMenuOpen);
+                  if (isMobileToolsOpen) setIsMobileToolsOpen(false);
+                }}
                 className="p-1 sm:px-2.5 sm:py-1.5 rounded-lg bg-stone-800/90 hover:bg-stone-700 border border-amber-500/30 text-stone-200 transition-colors flex items-center gap-1.5 text-xs"
               >
                 {currentUser.avatarUrl ? (
@@ -475,10 +465,10 @@ export const Navbar: React.FC<NavbarProps> = ({
                     {currentUser.name ? currentUser.name.charAt(0).toUpperCase() : "U"}
                   </div>
                 )}
-                <span className="hidden lg:inline text-[11px] font-medium max-w-[90px] truncate">
+                <span className="hidden xl:inline text-[11px] font-medium max-w-[90px] truncate">
                   {currentUser.name || currentUser.email.split("@")[0]}
                 </span>
-                <ChevronDown className="w-3 h-3 text-stone-400" />
+                <ChevronDown className="w-3 h-3 text-stone-400 hidden sm:inline" />
               </button>
 
               {isUserMenuOpen && (
@@ -579,6 +569,130 @@ export const Navbar: React.FC<NavbarProps> = ({
               <User className="w-3.5 h-3.5 text-amber-400" />
               <span className="hidden sm:inline text-[11px]">Sign In</span>
             </button>
+          )}
+        </div>
+
+        {/* Mobile & Tablet More Tools Dropdown (lg:hidden) */}
+        <div className="relative lg:hidden shrink-0">
+          <button
+            id="navbar-mobile-tools-btn"
+            onClick={() => {
+              setIsMobileToolsOpen(!isMobileToolsOpen);
+              if (isUserMenuOpen) setIsUserMenuOpen(false);
+            }}
+            className={`p-1.5 rounded-lg border transition-colors ${
+              isMobileToolsOpen
+                ? "bg-amber-500/20 border-amber-500/50 text-amber-400"
+                : "bg-stone-800/90 hover:bg-stone-700 border-stone-700/80 text-stone-300 hover:text-white"
+            }`}
+            title="More Spatial Design Tools"
+          >
+            {isMobileToolsOpen ? <X className="w-4 h-4" /> : <Menu className="w-4 h-4" />}
+          </button>
+
+          {isMobileToolsOpen && (
+            <div
+              id="navbar-mobile-tools-menu"
+              className="absolute right-0 mt-2 w-56 bg-stone-900 border border-stone-800 rounded-2xl shadow-2xl p-1.5 z-50 animate-in fade-in zoom-in-95 duration-100 text-stone-200 flex flex-col gap-0.5"
+            >
+              <button
+                onClick={() => {
+                  setIsMobileToolsOpen(false);
+                  handleCreateNewProject();
+                }}
+                className="w-full px-3 py-2 text-left text-xs rounded-xl hover:bg-stone-800 text-stone-200 hover:text-white flex items-center gap-2.5 transition-colors"
+              >
+                <Plus className="w-4 h-4 text-amber-400" />
+                <span>New Canvas</span>
+              </button>
+
+              <button
+                onClick={() => {
+                  setIsMobileToolsOpen(false);
+                  onOpenProjects();
+                }}
+                className="w-full px-3 py-2 text-left text-xs rounded-xl hover:bg-stone-800 text-stone-200 hover:text-white flex items-center gap-2.5 transition-colors"
+              >
+                <FolderOpen className="w-4 h-4 text-amber-400" />
+                <span>Saved Projects</span>
+              </button>
+
+              <button
+                onClick={() => {
+                  setIsMobileToolsOpen(false);
+                  openPublicProfileTab("gallery");
+                }}
+                className="w-full px-3 py-2 text-left text-xs rounded-xl hover:bg-stone-800 text-stone-200 hover:text-white flex items-center gap-2.5 transition-colors"
+              >
+                <Globe className="w-4 h-4 text-amber-400" />
+                <span>Public Gallery</span>
+              </button>
+
+              <button
+                onClick={() => {
+                  setIsMobileToolsOpen(false);
+                  onOpenRoomSettings();
+                }}
+                className="w-full px-3 py-2 text-left text-xs rounded-xl hover:bg-stone-800 text-stone-200 hover:text-white flex items-center gap-2.5 transition-colors"
+              >
+                <Sliders className="w-4 h-4 text-amber-400" />
+                <span>Room Dimensions & Colors</span>
+              </button>
+
+              {isCanvasActive && (
+                <button
+                  onClick={() => {
+                    setIsMobileToolsOpen(false);
+                    randomizeRealisticRoom();
+                  }}
+                  className="w-full px-3 py-2 text-left text-xs rounded-xl hover:bg-stone-800 text-stone-200 hover:text-white flex items-center gap-2.5 transition-colors"
+                >
+                  <Shuffle className="w-4 h-4 text-amber-400" />
+                  <span>Generate Random Room</span>
+                </button>
+              )}
+
+              <button
+                onClick={() => {
+                  setSnapToGrid(!snapToGrid);
+                }}
+                className="w-full px-3 py-2 text-left text-xs rounded-xl hover:bg-stone-800 text-stone-200 hover:text-white flex items-center justify-between transition-colors"
+              >
+                <div className="flex items-center gap-2.5">
+                  <Grid className="w-4 h-4 text-amber-400" />
+                  <span>Grid Snapping (0.25m)</span>
+                </div>
+                <span
+                  className={`w-2 h-2 rounded-full ${
+                    snapToGrid ? "bg-amber-400" : "bg-stone-600"
+                  }`}
+                />
+              </button>
+
+              <button
+                onClick={() => {
+                  setIsMobileToolsOpen(false);
+                  onOpenAI();
+                }}
+                className="w-full px-3 py-2 text-left text-xs rounded-xl bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 flex items-center gap-2.5 transition-colors"
+              >
+                <Sparkles className="w-4 h-4 text-amber-400" />
+                <span>AI Spatial Advisor</span>
+              </button>
+
+              <div className="border-t border-stone-800/80 my-1" />
+
+              <button
+                onClick={() => {
+                  setIsMobileToolsOpen(false);
+                  setIsSettingsModalOpen(true);
+                }}
+                className="w-full px-3 py-2 text-left text-xs rounded-xl hover:bg-stone-800 text-stone-300 hover:text-white flex items-center gap-2.5 transition-colors"
+              >
+                <Settings className="w-4 h-4 text-stone-400" />
+                <span>Settings (Theme & Units)</span>
+              </button>
+            </div>
           )}
         </div>
       </div>

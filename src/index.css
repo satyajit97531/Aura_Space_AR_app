@@ -12,6 +12,30 @@ body.theme-white,
   color-scheme: light;
   background-color: #f7f6f2 !important;
   color: #1c1917 !important;
+
+  /* Tailwind CSS v4 design token variable overrides */
+  --color-stone-950: #ffffff;
+  --color-stone-900: #faf9f6;
+  --color-stone-850: #f4f2ec;
+  --color-stone-800: #efece6;
+  --color-stone-700: #e2ddd5;
+  --color-stone-600: #d6d0c5;
+  --color-stone-500: #8c827a;
+  --color-stone-400: #68615a;
+  --color-stone-300: #3e3834;
+  --color-stone-200: #262220;
+  --color-stone-100: #141211;
+  --color-stone-50: #0c0a09;
+
+  --color-zinc-950: #ffffff;
+  --color-zinc-900: #faf9f6;
+  --color-zinc-800: #efece6;
+  --color-zinc-700: #e2ddd5;
+  --color-zinc-600: #d6d0c5;
+  --color-zinc-400: #68615a;
+  --color-zinc-300: #3e3834;
+  --color-zinc-200: #262220;
+  --color-zinc-100: #141211;
 }
 
 .theme-white #auraspace-app-root {
@@ -19,142 +43,131 @@ body.theme-white,
   color: #1c1917 !important;
 }
 
-/* Surfaces & Containers */
-.theme-white .bg-stone-950 {
+/* Surfaces & Containers in Light Mode */
+.theme-white [class*="bg-stone-950"] {
   background-color: #ffffff !important;
 }
-.theme-white .bg-stone-950\/90,
-.theme-white .bg-stone-950\/80,
-.theme-white .bg-stone-950\/70,
-.theme-white .bg-stone-950\/60,
-.theme-white .bg-stone-950\/40 {
-  background-color: #f5f4ef !important;
-}
-.theme-white .bg-stone-900,
-.theme-white .bg-stone-900\/95,
-.theme-white .bg-stone-900\/90,
-.theme-white .bg-stone-900\/80,
-.theme-white .bg-stone-900\/60 {
+.theme-white [class*="bg-stone-900"] {
   background-color: #faf9f6 !important;
 }
-.theme-white .bg-stone-850 {
-  background-color: #f0eee8 !important;
+.theme-white [class*="bg-stone-850"] {
+  background-color: #f4f2ec !important;
 }
-.theme-white .bg-stone-800,
-.theme-white .bg-stone-800\/90,
-.theme-white .bg-stone-800\/80,
-.theme-white .bg-stone-800\/60,
-.theme-white .bg-stone-800\/50,
-.theme-white .bg-stone-800\/40 {
-  background-color: #eae7df !important;
+.theme-white [class*="bg-stone-800"] {
+  background-color: #efece6 !important;
 }
-.theme-white .bg-stone-700,
-.theme-white .bg-stone-700\/80 {
-  background-color: #ded9cd !important;
+.theme-white [class*="bg-stone-700"] {
+  background-color: #e2ddd5 !important;
 }
-.theme-white .bg-black {
-  background-color: #f4f2eb !important;
+.theme-white .bg-black,
+.theme-white .bg-black\/60,
+.theme-white .bg-black\/70,
+.theme-white .bg-black\/80 {
+  background-color: rgba(28, 25, 23, 0.45) !important;
 }
-.theme-white .bg-zinc-950 {
+.theme-white [class*="bg-zinc-950"] {
   background-color: #ffffff !important;
 }
-.theme-white .bg-zinc-900 {
+.theme-white [class*="bg-zinc-900"] {
   background-color: #faf9f6 !important;
 }
-.theme-white .bg-zinc-800 {
-  background-color: #eae7df !important;
+.theme-white [class*="bg-zinc-800"] {
+  background-color: #efece6 !important;
 }
 
-/* Modals & Dialogs */
+/* Modals, Dialogs & Flyouts */
 .theme-white [role="dialog"],
-.theme-white .modal-surface {
+.theme-white .modal-surface,
+.theme-white #settings-modal-card,
+.theme-white #share-modal-content,
+.theme-white #profile-modal-content,
+.theme-white #projects-modal-card,
+.theme-white #room-settings-modal-card,
+.theme-white #new-canvas-modal-card {
   background-color: #ffffff !important;
-  border-color: #e5e0d8 !important;
-  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.15) !important;
+  border-color: #e2ddd5 !important;
+  color: #141211 !important;
+  box-shadow: 0 25px 50px -12px rgba(28, 25, 23, 0.14) !important;
 }
 
-/* Borders */
-.theme-white .border-stone-800,
-.theme-white .border-stone-800\/80,
-.theme-white .border-stone-800\/60,
-.theme-white .border-stone-800\/40,
-.theme-white .border-stone-700,
-.theme-white .border-stone-700\/80,
-.theme-white .border-stone-600,
-.theme-white .border-zinc-800 {
-  border-color: #e5e0d8 !important;
+/* Borders in Light Mode */
+.theme-white [class*="border-stone-800"],
+.theme-white [class*="border-stone-700"],
+.theme-white [class*="border-stone-600"],
+.theme-white [class*="border-zinc-800"] {
+  border-color: #e2ddd5 !important;
 }
 
 /* Typography & High-Contrast Readability */
-.theme-white .text-stone-100,
-.theme-white .text-stone-200 {
-  color: #1c1917 !important;
+.theme-white [class*="text-stone-100"],
+.theme-white [class*="text-stone-200"] {
+  color: #141211 !important;
 }
-.theme-white .text-stone-300 {
-  color: #292524 !important;
+.theme-white [class*="text-stone-300"] {
+  color: #262220 !important;
 }
-.theme-white .text-stone-400 {
+.theme-white [class*="text-stone-400"] {
   color: #57534e !important;
 }
-.theme-white .text-stone-500 {
+.theme-white [class*="text-stone-500"] {
   color: #78716c !important;
 }
-.theme-white .text-stone-600 {
-  color: #8c857b !important;
+.theme-white [class*="text-stone-600"] {
+  color: #8c827a !important;
 }
 
-/* Text white overrides (unless in dark badges / primary buttons) */
-.theme-white :not(.bg-amber-500):not(.bg-rose-500):not(.bg-emerald-500):not(.bg-indigo-500):not(.bg-sky-500):not(.bg-stone-900) > .text-white,
-.theme-white h1.text-white,
-.theme-white h2.text-white,
-.theme-white h3.text-white,
-.theme-white h4.text-white,
-.theme-white span.text-white:not(.badge-text),
-.theme-white p.text-white {
-  color: #18181b !important;
+/* Headings in Light Mode */
+.theme-white h1,
+.theme-white h2,
+.theme-white h3,
+.theme-white h4,
+.theme-white h5,
+.theme-white h6 {
+  color: #141211 !important;
 }
 
-/* Hover States in Light Mode */
-.theme-white .hover\:bg-stone-800:hover {
-  background-color: #eae7df !important;
+/* White text overrides - preserve white text ONLY inside dark or colored buttons/badges */
+.theme-white .text-white:not([class*="bg-amber-"]):not([class*="bg-emerald-"]):not([class*="bg-rose-"]):not([class*="bg-red-"]):not([class*="bg-indigo-"]):not([class*="bg-sky-"]):not(.badge-pill) {
+  color: #141211 !important;
 }
-.theme-white .hover\:bg-stone-700:hover {
-  background-color: #e2ded5 !important;
+
+/* Interactive Hover States in Light Mode */
+.theme-white [class*="hover:bg-stone-800"]:hover,
+.theme-white [class*="hover:bg-stone-700"]:hover {
+  background-color: #e5e0d6 !important;
 }
-.theme-white .hover\:text-white:hover {
+.theme-white [class*="hover:text-white"]:hover {
   color: #0c0a09 !important;
 }
-.theme-white .hover\:text-stone-200:hover {
-  color: #1c1917 !important;
-}
-.theme-white .hover\:text-stone-300:hover {
-  color: #292524 !important;
+.theme-white [class*="hover:text-stone-200"]:hover,
+.theme-white [class*="hover:text-stone-300"]:hover {
+  color: #141211 !important;
 }
 
-/* Input Fields & Textareas */
-.theme-white input:not([type="color"]):not([type="checkbox"]):not([type="range"]),
+/* Form Controls & Inputs */
+.theme-white input:not([type="checkbox"]):not([type="range"]):not([type="color"]),
 .theme-white textarea,
 .theme-white select {
   background-color: #ffffff !important;
-  border-color: #d6d3cc !important;
-  color: #1c1917 !important;
+  border-color: #d6d0c5 !important;
+  color: #141211 !important;
 }
 .theme-white input::placeholder,
 .theme-white textarea::placeholder {
-  color: #8c857b !important;
+  color: #8c827a !important;
 }
 
-/* Empty Screen & Canvas Overlays */
+/* Canvas & Overlays */
 .theme-white #canvas-empty-black-screen {
   background-color: transparent !important;
 }
-.theme-white #canvas-empty-black-screen .bg-stone-900 {
+.theme-white #canvas-empty-black-screen [class*="bg-stone-900"] {
   background-color: #ffffff !important;
-  border-color: #e5e0d8 !important;
-  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.08) !important;
+  border-color: #e2ddd5 !important;
+  box-shadow: 0 10px 25px -5px rgba(28, 25, 23, 0.08) !important;
 }
 
-/* 2. ONYX DARK THEME */
+/* 2. ONYX DARK THEME (Dark Studio) */
 html.theme-dark,
 body.theme-dark,
 [data-theme="dark"],
@@ -162,19 +175,24 @@ body.theme-dark,
   color-scheme: dark;
   background-color: #09090b !important;
   color: #f4f4f5 !important;
+
+  --color-stone-950: #09090b;
+  --color-stone-900: #121215;
+  --color-stone-800: #1c1c22;
+  --color-stone-700: #27272f;
 }
 .theme-dark #auraspace-app-root {
   background-color: #09090b !important;
 }
-.theme-dark .bg-stone-950 {
+.theme-dark [class*="bg-stone-950"] {
   background-color: #09090b !important;
 }
-.theme-dark .bg-stone-900 {
+.theme-dark [class*="bg-stone-900"] {
   background-color: #121215 !important;
 }
-.theme-dark .bg-stone-800 {
+.theme-dark [class*="bg-stone-800"] {
   background-color: #1c1c22 !important;
 }
-.theme-dark .border-stone-800 {
+.theme-dark [class*="border-stone-800"] {
   border-color: #27272f !important;
 }

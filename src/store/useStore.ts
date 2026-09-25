@@ -1081,31 +1081,53 @@ export const useStore = create<AuraState>((set, get) => ({
     const user = get().currentUser;
     const storageKey = getUserStorageKey(user);
 
-    // Check localStorage first
+    // If guest / not logged in: strictly load only guest projects
+    if (!user || !user.id) {
+      let guestList: AuraProject[] = [];
+      try {
+        const local = localStorage.getItem("aura_projects_guest");
+        if (local) {
+          const parsed = JSON.parse(local);
+          guestList = parsed.filter(
+            (p: AuraProject) => !p.userId || p.userId === "anonymous" || p.userId === "guest"
+          );
+        }
+      } catch (e) {
+        console.warn("Error reading guest localStorage projects:", e);
+      }
+      set({ savedProjects: deduplicate(guestList) });
+      return;
+    }
+
+    // Specific authenticated user: strictly isolate projects
     let localList: AuraProject[] = [];
     try {
       const local = localStorage.getItem(storageKey);
       if (local) {
-        localList = JSON.parse(local);
+        const parsed = JSON.parse(local);
+        // STRICT USER BOUNDARY: Only projects matching this user's ID
+        localList = parsed.filter((p: AuraProject) => !p.userId || p.userId === user.id);
       }
     } catch (e) {
       console.warn("Error reading localStorage projects:", e);
     }
 
-    // Then check MongoDB scoped to current logged-in user
-    if (user && user.id) {
-      try {
-        const res = await fetch(`/api/projects?userId=${encodeURIComponent(user.id)}`);
-        const data = await res.json();
-        if (data.success && Array.isArray(data.projects)) {
-          const all = [...data.projects, ...localList];
-          const deduped = deduplicate(all);
-          set({ savedProjects: deduped });
-          return;
-        }
-      } catch (e) {
-        console.warn("Offline or MongoDB fetch failed, using local list:", e);
+    // Cloud synchronization scoped strictly to this user
+    try {
+      const res = await fetch(`/api/projects?userId=${encodeURIComponent(user.id)}`);
+      const data = await res.json();
+      if (data.success && Array.isArray(data.projects)) {
+        const userCloudProjects = data.projects.filter(
+          (p: any) => p.userId === user.id || !p.userId
+        );
+        const all = [...userCloudProjects, ...localList];
+        const deduped = deduplicate(all);
+        localStorage.setItem(storageKey, JSON.stringify(deduped));
+        set({ savedProjects: deduped });
+        return;
       }
+    } catch (e) {
+      console.warn("Offline or Cloud fetch notice, using local list:", e);
     }
 
     set({ savedProjects: deduplicate(localList) });
@@ -1255,7 +1277,15 @@ export const useStore = create<AuraState>((set, get) => ({
         localStorage.removeItem("aura_user_account");
       }
     }
-    set({ currentUser: user, savedProjects: [] });
+    // Strict user workspace isolation: Reset project and active canvas so other accounts' designs never bleed
+    set({
+      currentUser: user,
+      savedProjects: [],
+      currentProjectId: null,
+      currentProjectName: "Untitled Spatial Plan",
+      placedObjects: [],
+      isCanvasActive: false,
+    });
     get().fetchSavedProjects();
   },
   logout: () => {

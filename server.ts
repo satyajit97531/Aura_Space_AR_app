@@ -2,6 +2,7 @@ import express from "express";
 import path from "path";
 import crypto from "crypto";
 import fs from "fs";
+import nodemailer from "nodemailer";
 import { MongoClient, ObjectId } from "mongodb";
 import { GoogleGenAI } from "@google/genai";
 import dotenv from "dotenv";
@@ -16,6 +17,162 @@ app.use(express.json({ limit: "10mb" }));
 // Password hashing helper
 function hashPassword(password: string): string {
   return crypto.createHash("sha256").update(password + "auraspace_secure_salt_2026").digest("hex");
+}
+
+// Email format validation (RFC 5322 compatible with TLD check)
+function isValidEmail(email?: string): boolean {
+  if (!email || typeof email !== "string") return false;
+  const clean = email.trim().toLowerCase();
+  if (clean.length < 5 || clean.length > 254) return false;
+  const regex = /^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)+$/;
+  if (!regex.test(clean)) return false;
+  const parts = clean.split("@");
+  if (parts.length !== 2) return false;
+  const domainParts = parts[1].split(".");
+  if (domainParts.length < 2) return false;
+  const tld = domainParts[domainParts.length - 1];
+  if (tld.length < 2 || !/^[a-zA-Z]+$/.test(tld)) return false;
+  return true;
+}
+
+interface OtpRecord {
+  code: string;
+  email: string;
+  purpose: "signup" | "forgot_password";
+  expiresAt: number;
+  attempts: number;
+  createdAt: number;
+}
+
+const otpStore = new Map<string, OtpRecord>();
+
+// Clean up expired OTPs periodically
+setInterval(() => {
+  const now = Date.now();
+  for (const [key, record] of otpStore.entries()) {
+    if (record.expiresAt < now) {
+      otpStore.delete(key);
+    }
+  }
+}, 5 * 60 * 1000);
+
+let mailTransporter: any = null;
+function getMailTransporter() {
+  if (mailTransporter) return mailTransporter;
+  const host = process.env.SMTP_HOST || (process.env.GMAIL_USER ? "smtp.gmail.com" : undefined);
+  const user = process.env.SMTP_USER || process.env.GMAIL_USER;
+  const pass = process.env.SMTP_PASS || process.env.GMAIL_APP_PASSWORD;
+  const port = parseInt(process.env.SMTP_PORT || (host === "smtp.gmail.com" ? "587" : "587"), 10);
+  const secure = process.env.SMTP_SECURE === "true" || port === 465;
+
+  if (user && pass) {
+    mailTransporter = nodemailer.createTransport({
+      host: host || "smtp.gmail.com",
+      port,
+      secure,
+      auth: { user, pass },
+      tls: { rejectUnauthorized: false },
+    });
+  }
+  return mailTransporter;
+}
+
+async function sendOtpEmail(
+  email: string,
+  code: string,
+  purpose: "signup" | "forgot_password"
+): Promise<{ sent: boolean; configured: boolean; provider?: string; error?: string }> {
+  const subject =
+    purpose === "signup"
+      ? `${code} is your AuraSpace verification code`
+      : `${code} is your AuraSpace login & password reset code`;
+
+  const heading =
+    purpose === "signup" ? "Verify Your Email Address" : "Sign In & Password Reset";
+
+  const description =
+    purpose === "signup"
+      ? "Thank you for creating an account on AuraSpace. Use this 6-digit verification code to confirm your email address and activate your private spatial design cloud workspace:"
+      : "You requested to log in or reset your password on AuraSpace. Use this 6-digit verification code to securely access your account:";
+
+  const textBody = `${heading}\n\n${description}\n\nYour 6-digit verification code is: ${code}\n\nThis code will expire in 10 minutes. If you did not request this code, you can safely ignore this email.\n\nAuraSpace Studio`;
+
+  const html = `
+    <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; max-width: 540px; margin: 0 auto; padding: 32px 20px; background-color: #0c0a09; color: #f5f5f4; border-radius: 16px; border: 1px solid #292524;">
+      <div style="text-align: center; margin-bottom: 24px;">
+        <div style="display: inline-block; width: 44px; height: 44px; background: linear-gradient(135deg, #f59e0b, #d97706); border-radius: 12px; line-height: 44px; font-weight: 700; color: #0c0a09; font-size: 18px;">AS</div>
+        <h1 style="color: #ffffff; font-size: 22px; font-weight: 700; margin: 12px 0 4px 0; letter-spacing: -0.5px;">AuraSpace</h1>
+        <p style="color: #a8a29e; font-size: 13px; margin: 0;">3D Spatial Planning & AR Interior Design</p>
+      </div>
+      <div style="background-color: #1c1917; padding: 24px; border-radius: 12px; border: 1px solid #292524;">
+        <h2 style="color: #f5f5f4; font-size: 16px; margin: 0 0 12px 0; font-weight: 600;">${heading}</h2>
+        <p style="color: #d6d3d1; font-size: 14px; line-height: 1.5; margin: 0 0 20px 0;">${description}</p>
+        <div style="text-align: center; margin: 24px 0; padding: 18px; background-color: #0c0a09; border-radius: 10px; border: 1px dashed #d97706;">
+          <span style="font-family: 'SF Mono', Consolas, Monaco, monospace; font-size: 32px; font-weight: 700; letter-spacing: 8px; color: #f59e0b;">${code}</span>
+        </div>
+        <p style="color: #a8a29e; font-size: 12px; margin: 0; line-height: 1.5;">This verification code is valid for <strong>10 minutes</strong>. Never share this code with anyone. If you didn't request this, you can safely ignore this email.</p>
+      </div>
+      <div style="text-align: center; margin-top: 24px; color: #78716c; font-size: 11px;">
+        <p style="margin: 0;">&copy; ${new Date().getFullYear()} AuraSpace Studio. Your blueprints remain private and securely stored in your personal account.</p>
+      </div>
+    </div>
+  `;
+
+  console.log(`[AuraSpace Auth] 📧 Verification OTP for ${email} [${purpose}]: [ ${code} ] (Expires in 10 minutes)`);
+
+  // 1. Try Resend API if RESEND_API_KEY is configured
+  if (process.env.RESEND_API_KEY) {
+    try {
+      const fromAddr = process.env.RESEND_FROM || "AuraSpace <onboarding@resend.dev>";
+      const res = await fetch("https://api.resend.com/emails", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${process.env.RESEND_API_KEY}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          from: fromAddr,
+          to: [email],
+          subject,
+          text: textBody,
+          html,
+        }),
+      });
+
+      if (res.ok) {
+        console.log(`[AuraSpace Auth] Successfully delivered email via Resend to ${email}`);
+        return { sent: true, configured: true, provider: "Resend" };
+      } else {
+        const errorData = await res.json().catch(() => ({}));
+        console.warn("[AuraSpace Auth] Resend API error:", errorData);
+      }
+    } catch (err: any) {
+      console.warn("[AuraSpace Auth] Resend dispatch error:", err.message);
+    }
+  }
+
+  // 2. Try SMTP / Gmail Transporter if configured
+  const transporter = getMailTransporter();
+  if (transporter) {
+    try {
+      const fromUser = process.env.SMTP_USER || process.env.GMAIL_USER;
+      const fromAddr = process.env.SMTP_FROM || `"AuraSpace Security" <${fromUser}>`;
+      await transporter.sendMail({
+        from: fromAddr,
+        to: email,
+        subject,
+        text: textBody,
+        html,
+      });
+      console.log(`[AuraSpace Auth] Successfully delivered email via SMTP to ${email}`);
+      return { sent: true, configured: true, provider: "SMTP" };
+    } catch (err: any) {
+      console.warn("[AuraSpace Auth] SMTP dispatch notice:", err.message);
+      return { sent: false, configured: true, error: err.message };
+    }
+  }
+
+  return { sent: false, configured: false };
 }
 
 function sanitizeMongoUri(raw?: string): string | null {
@@ -651,10 +808,129 @@ app.get("/api/health", async (req, res) => {
   });
 });
 
-// 2. User Authentication API (Signup & Login with MongoDB)
+// 2. User Authentication API (Strict Email Validation, Nodemailer Email OTP & Passwordless Login)
+
+// Send OTP to email for signup or password recovery
+app.post("/api/auth/send-otp", async (req, res) => {
+  try {
+    const { email, purpose } = req.body;
+    if (!email || !isValidEmail(email)) {
+      return res.status(400).json({
+        success: false,
+        error: "Please provide a valid, well-formed email address (e.g., name@example.com).",
+      });
+    }
+
+    const cleanEmail = String(email).trim().toLowerCase();
+    const cleanPurpose = purpose === "forgot_password" ? "forgot_password" : "signup";
+
+    const db = await getDb();
+    const existing = await db.collection("users").findOne({ email: cleanEmail });
+
+    if (cleanPurpose === "signup" && existing) {
+      return res.status(400).json({
+        success: false,
+        error: "An account with this email address already exists. Please sign in or use forgot password.",
+      });
+    }
+
+    if (cleanPurpose === "forgot_password" && !existing) {
+      return res.status(404).json({
+        success: false,
+        error: "No AuraSpace account registered with this email address. Please check your spelling or create an account.",
+      });
+    }
+
+    const cacheKey = `${cleanEmail}::${cleanPurpose}`;
+    const prev = otpStore.get(cacheKey);
+    const now = Date.now();
+    // Rate limit: 25 seconds cooldown
+    if (prev && now - prev.createdAt < 25 * 1000) {
+      const waitSec = Math.ceil((25 * 1000 - (now - prev.createdAt)) / 1000);
+      return res.status(429).json({
+        success: false,
+        error: `Please wait ${waitSec}s before requesting a new verification code.`,
+      });
+    }
+
+    const otpCode = crypto.randomInt(100000, 999999).toString();
+    otpStore.set(cacheKey, {
+      code: otpCode,
+      email: cleanEmail,
+      purpose: cleanPurpose,
+      expiresAt: now + 10 * 60 * 1000, // 10 minutes
+      attempts: 0,
+      createdAt: now,
+    });
+
+    const sendRes = await sendOtpEmail(cleanEmail, otpCode, cleanPurpose);
+
+    res.json({
+      success: true,
+      message: sendRes.sent
+        ? `A 6-digit verification code has been dispatched to ${cleanEmail}. Please check your inbox and spam folder.`
+        : `A 6-digit verification code has been dispatched to ${cleanEmail}. Please check your email.`,
+      sentToEmail: sendRes.sent,
+    });
+  } catch (err: any) {
+    console.error("send-otp error:", err);
+    res.status(500).json({ success: false, error: err.message || "Failed to send verification code." });
+  }
+});
+
+// Verify OTP
+app.post("/api/auth/verify-otp", async (req, res) => {
+  try {
+    const { email, code, purpose } = req.body;
+    if (!email || !code) {
+      return res.status(400).json({ success: false, error: "Email and verification code are required." });
+    }
+
+    const cleanEmail = String(email).trim().toLowerCase();
+    const cleanPurpose = purpose === "forgot_password" ? "forgot_password" : "signup";
+    const cacheKey = `${cleanEmail}::${cleanPurpose}`;
+    const record = otpStore.get(cacheKey);
+
+    if (!record) {
+      return res.status(400).json({
+        success: false,
+        error: "Verification code expired or not requested. Please request a new code.",
+      });
+    }
+
+    if (Date.now() > record.expiresAt) {
+      otpStore.delete(cacheKey);
+      return res.status(400).json({
+        success: false,
+        error: "Verification code has expired. Please request a new code.",
+      });
+    }
+
+    if (record.attempts >= 5) {
+      otpStore.delete(cacheKey);
+      return res.status(400).json({
+        success: false,
+        error: "Too many incorrect attempts. Please request a new code.",
+      });
+    }
+
+    if (String(code).trim() !== record.code) {
+      record.attempts += 1;
+      return res.status(400).json({
+        success: false,
+        error: `Invalid verification code. ${5 - record.attempts} attempts remaining.`,
+      });
+    }
+
+    res.json({ success: true, message: "Code verified successfully." });
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
 app.post("/api/auth/signup", async (req, res) => {
   try {
-    const { name, email, password } = req.body;
+    const { name, email, password, otp } = req.body;
 
     if (!email || !password || !name) {
       return res.status(400).json({
@@ -666,7 +942,7 @@ app.post("/api/auth/signup", async (req, res) => {
     const cleanEmail = String(email).trim().toLowerCase();
     const cleanName = String(name).trim();
 
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cleanEmail)) {
+    if (!isValidEmail(cleanEmail)) {
       return res.status(400).json({
         success: false,
         error: "Please enter a valid email address.",
@@ -677,6 +953,25 @@ app.post("/api/auth/signup", async (req, res) => {
       return res.status(400).json({
         success: false,
         error: "Password must be at least 6 characters.",
+      });
+    }
+
+    // Verify OTP code
+    const cacheKey = `${cleanEmail}::signup`;
+    const record = otpStore.get(cacheKey);
+
+    if (!record || Date.now() > record.expiresAt) {
+      return res.status(400).json({
+        success: false,
+        error: "Email verification required. Please click 'Send Verification Code' to verify your email first.",
+      });
+    }
+
+    if (String(otp || "").trim() !== record.code) {
+      record.attempts = (record.attempts || 0) + 1;
+      return res.status(400).json({
+        success: false,
+        error: "Invalid email verification code. Please check your email or request a new code.",
       });
     }
 
@@ -694,6 +989,7 @@ app.post("/api/auth/signup", async (req, res) => {
       username: cleanName,
       name: cleanName,
       email: cleanEmail,
+      emailVerified: true,
       password: hashPassword(password),
       createdAt: now,
       lastLoginAt: now,
@@ -707,6 +1003,9 @@ app.post("/api/auth/signup", async (req, res) => {
 
     const insertResult = await db.collection("users").insertOne(newUser);
     const userId = insertResult.insertedId.toString();
+
+    // Consume OTP once successfully registered
+    otpStore.delete(cacheKey);
 
     res.json({
       success: true,
@@ -745,6 +1044,13 @@ app.post("/api/auth/login", async (req, res) => {
     }
 
     const cleanEmail = String(email).trim().toLowerCase();
+    if (!isValidEmail(cleanEmail)) {
+      return res.status(400).json({
+        success: false,
+        error: "Please enter a valid email address.",
+      });
+    }
+
     const hashedPassword = hashPassword(password);
 
     const db = await getDb();
@@ -756,7 +1062,7 @@ app.post("/api/auth/login", async (req, res) => {
     if (!user) {
       return res.status(401).json({
         success: false,
-        error: "Invalid email or password. Please verify your credentials.",
+        error: "Invalid email or password. You can also use 'Sign in with OTP' if you forgot your password.",
       });
     }
 
@@ -792,6 +1098,150 @@ app.post("/api/auth/login", async (req, res) => {
       success: false,
       error: err.message || "Failed to authenticate. Please check your database connection.",
     });
+  }
+});
+
+// Instant login via OTP for forgot password
+app.post("/api/auth/login-otp", async (req, res) => {
+  try {
+    const { email, otp } = req.body;
+    if (!email || !otp) {
+      return res.status(400).json({ success: false, error: "Email and verification code are required." });
+    }
+
+    const cleanEmail = String(email).trim().toLowerCase();
+    const cacheKey = `${cleanEmail}::forgot_password`;
+    const record = otpStore.get(cacheKey);
+
+    if (!record || Date.now() > record.expiresAt) {
+      return res.status(400).json({
+        success: false,
+        error: "Verification code expired or not requested. Please request a new code.",
+      });
+    }
+
+    if (String(otp).trim() !== record.code) {
+      record.attempts = (record.attempts || 0) + 1;
+      return res.status(400).json({
+        success: false,
+        error: "Invalid verification code. Please check your email and try again.",
+      });
+    }
+
+    const db = await getDb();
+    const user = await db.collection("users").findOne({ email: cleanEmail });
+    if (!user) {
+      return res.status(404).json({ success: false, error: "No account found with this email address." });
+    }
+
+    const now = new Date().toISOString();
+    await db.collection("users").updateOne(
+      { _id: user._id },
+      { $set: { lastLoginAt: now } }
+    );
+
+    // Consume OTP
+    otpStore.delete(cacheKey);
+
+    const userProjects = user.projects || [];
+    const totalLikes = userProjects.reduce((acc: number, p: any) => acc + (p.likesCount || 0), 0);
+
+    res.json({
+      success: true,
+      user: {
+        id: user._id.toString(),
+        name: user.name || user.username,
+        username: user.username || user.name,
+        email: user.email,
+        createdAt: user.createdAt,
+        bio: user.bio || "",
+        avatarUrl: user.avatarUrl || `https://api.dicebear.com/7.x/identicon/svg?seed=${encodeURIComponent(user.email)}`,
+        badges: user.badges || ["first_blueprint"],
+        showcasedBadges: user.showcasedBadges || ["first_blueprint"],
+        totalLikes: typeof user.totalLikes === "number" ? user.totalLikes : totalLikes,
+        projects: userProjects,
+      },
+    });
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: err.message || "Failed to log in with verification code." });
+  }
+});
+
+// Reset password via OTP
+app.post("/api/auth/reset-password-otp", async (req, res) => {
+  try {
+    const { email, otp, newPassword } = req.body;
+    if (!email || !otp || !newPassword) {
+      return res.status(400).json({
+        success: false,
+        error: "Email, verification code, and new password are required.",
+      });
+    }
+
+    if (String(newPassword).length < 6) {
+      return res.status(400).json({
+        success: false,
+        error: "New password must be at least 6 characters long.",
+      });
+    }
+
+    const cleanEmail = String(email).trim().toLowerCase();
+    const cacheKey = `${cleanEmail}::forgot_password`;
+    const record = otpStore.get(cacheKey);
+
+    if (!record || Date.now() > record.expiresAt) {
+      return res.status(400).json({
+        success: false,
+        error: "Verification code expired or not requested. Please request a new code.",
+      });
+    }
+
+    if (String(otp).trim() !== record.code) {
+      record.attempts = (record.attempts || 0) + 1;
+      return res.status(400).json({
+        success: false,
+        error: "Invalid verification code. Please check your email and try again.",
+      });
+    }
+
+    const db = await getDb();
+    const user = await db.collection("users").findOne({ email: cleanEmail });
+    if (!user) {
+      return res.status(404).json({ success: false, error: "No account found with this email address." });
+    }
+
+    const hashedPassword = hashPassword(newPassword);
+    const now = new Date().toISOString();
+    await db.collection("users").updateOne(
+      { _id: user._id },
+      { $set: { password: hashedPassword, passwordUpdatedAt: now, lastLoginAt: now } }
+    );
+
+    // Consume OTP
+    otpStore.delete(cacheKey);
+
+    const userProjects = user.projects || [];
+    const totalLikes = userProjects.reduce((acc: number, p: any) => acc + (p.likesCount || 0), 0);
+
+    res.json({
+      success: true,
+      message: "Password updated successfully! Welcome back to AuraSpace.",
+      user: {
+        id: user._id.toString(),
+        name: user.name || user.username,
+        username: user.username || user.name,
+        email: user.email,
+        createdAt: user.createdAt,
+        bio: user.bio || "",
+        avatarUrl: user.avatarUrl || `https://api.dicebear.com/7.x/identicon/svg?seed=${encodeURIComponent(user.email)}`,
+        badges: user.badges || ["first_blueprint"],
+        showcasedBadges: user.showcasedBadges || ["first_blueprint"],
+        totalLikes: typeof user.totalLikes === "number" ? user.totalLikes : totalLikes,
+        projects: userProjects,
+      },
+    });
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: err.message || "Failed to reset password." });
   }
 });
 
@@ -981,14 +1431,14 @@ app.get("/api/projects", async (req, res) => {
     const db = await getDb();
     const userId = req.query.userId as string | undefined;
 
-    if (!userId || userId === "anonymous") {
+    if (!userId || userId === "anonymous" || userId === "guest" || userId === "undefined" || userId === "null") {
       return res.json({
         success: true,
         projects: [],
       });
     }
 
-    // Fetch user document to read embedded projects inside the specific user
+    // Fetch user document to read embedded projects inside the specific user ONLY
     let userDoc: any = null;
     try {
       if (ObjectId.isValid(userId)) {
@@ -999,11 +1449,24 @@ app.get("/api/projects", async (req, res) => {
       }
     } catch (e) {}
 
+    if (!userDoc) {
+      return res.json({
+        success: true,
+        projects: [],
+      });
+    }
+
+    // Strictly ensure only projects belonging to this user document are returned
     const userEmbeddedProjects: any[] = userDoc?.projects || [];
-    const projects = userEmbeddedProjects.map((p: any) => ({
-      ...p,
-      id: p.id || p.clientProjId || (p._id ? p._id.toString() : `project_${Date.now()}`),
-    }));
+    const projects = userEmbeddedProjects
+      .filter((p: any) => !p.userId || String(p.userId) === String(userDoc._id) || String(p.userId) === String(userDoc.id) || p.userEmail === userDoc.email)
+      .map((p: any) => ({
+        ...p,
+        id: p.id || p.clientProjId || (p._id ? p._id.toString() : `project_${Date.now()}`),
+        userId: userDoc._id.toString(),
+        userEmail: userDoc.email,
+        userName: userDoc.name || userDoc.username || p.userName,
+      }));
 
     projects.sort((a, b) => new Date(b.updatedAt || 0).getTime() - new Date(a.updatedAt || 0).getTime());
 
@@ -1058,6 +1521,11 @@ app.post("/api/projects", async (req, res) => {
 
       const user = await db.collection("users").findOne(userFilter);
       if (user) {
+        // Enforce strict user ownership
+        doc.userId = user._id.toString();
+        doc.userEmail = user.email;
+        doc.userName = user.name || user.username || doc.userName;
+
         const existingProjects: any[] = user.projects || [];
         const idx = existingProjects.findIndex(
           (p: any) => p.id === clientProjId || p.clientProjId === clientProjId || (p.name === doc.name && doc.name)

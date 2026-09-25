@@ -2,6 +2,7 @@ import express from "express";
 import path from "path";
 import crypto from "crypto";
 import fs from "fs";
+import os from "os";
 import nodemailer from "nodemailer";
 import { MongoClient, ObjectId } from "mongodb";
 import { GoogleGenAI } from "@google/genai";
@@ -47,7 +48,7 @@ interface OtpRecord {
 const otpStore = new Map<string, OtpRecord>();
 
 // Clean up expired OTPs periodically
-setInterval(() => {
+const otpCleanupInterval = setInterval(() => {
   const now = Date.now();
   for (const [key, record] of otpStore.entries()) {
     if (record.expiresAt < now) {
@@ -55,6 +56,9 @@ setInterval(() => {
     }
   }
 }, 5 * 60 * 1000);
+if (typeof otpCleanupInterval?.unref === "function") {
+  otpCleanupInterval.unref();
+}
 
 let mailTransporter: any = null;
 function getMailTransporter() {
@@ -280,23 +284,23 @@ class LocalFileDatabase {
 
   constructor(filePath: string) {
     this.filePath = filePath;
-    const dir = path.dirname(filePath);
-    if (!fs.existsSync(dir)) {
-      fs.mkdirSync(dir, { recursive: true });
-    }
+    this.data = { users: [] };
 
-    if (fs.existsSync(filePath)) {
-      try {
-        const content = fs.readFileSync(filePath, "utf8");
-        this.data = JSON.parse(content);
-        if (!Array.isArray(this.data.users)) {
-          this.data.users = [];
-        }
-      } catch {
-        this.data = { users: [] };
+    try {
+      const dir = path.dirname(filePath);
+      if (!fs.existsSync(dir)) {
+        fs.mkdirSync(dir, { recursive: true });
       }
-    } else {
-      this.data = { users: [] };
+
+      if (fs.existsSync(filePath)) {
+        const content = fs.readFileSync(filePath, "utf8");
+        const parsed = JSON.parse(content);
+        if (Array.isArray(parsed?.users)) {
+          this.data = parsed;
+        }
+      }
+    } catch (e: any) {
+      console.warn("[AuraSpace] Notice initializing local storage file:", e.message);
     }
 
     // Seed default showcase users if database is empty
@@ -572,6 +576,10 @@ class LocalFileDatabase {
 
   private persist() {
     try {
+      const dir = path.dirname(this.filePath);
+      if (!fs.existsSync(dir)) {
+        fs.mkdirSync(dir, { recursive: true });
+      }
       const tempPath = `${this.filePath}.tmp.${Date.now()}`;
       fs.writeFileSync(tempPath, JSON.stringify(this.data, null, 2), "utf8");
       fs.renameSync(tempPath, this.filePath);
@@ -663,7 +671,14 @@ class LocalFileDatabase {
 let localDbInstance: LocalFileDatabase | null = null;
 function getLocalFileDb(): LocalFileDatabase {
   if (!localDbInstance) {
-    const dbPath = path.join(process.cwd(), "data", "auraspace_db.json");
+    const isServerless = Boolean(
+      process.env.VERCEL ||
+      process.env.AWS_LAMBDA_FUNCTION_NAME ||
+      process.env.LAMBDA_TASK_ROOT
+    );
+    const dbPath = isServerless
+      ? path.join(os.tmpdir(), "auraspace_db.json")
+      : path.join(process.cwd(), "data", "auraspace_db.json");
     localDbInstance = new LocalFileDatabase(dbPath);
   }
   return localDbInstance;
@@ -865,12 +880,17 @@ app.post("/api/auth/send-otp", async (req, res) => {
 
     const sendRes = await sendOtpEmail(cleanEmail, otpCode, cleanPurpose);
 
+    const message = sendRes.sent
+      ? `A 6-digit verification code has been dispatched to ${cleanEmail}. Please check your inbox and spam folder.`
+      : sendRes.configured
+      ? `Email dispatch issue: ${sendRes.error || "Please verify your email credentials."}`
+      : `Verification code generated for ${cleanEmail}. Notice: Configure your email provider (SMTP/Resend) in Vercel to receive emails in real inboxes.`;
+
     res.json({
       success: true,
-      message: sendRes.sent
-        ? `A 6-digit verification code has been dispatched to ${cleanEmail}. Please check your inbox and spam folder.`
-        : `A 6-digit verification code has been dispatched to ${cleanEmail}. Please check your email.`,
+      message,
       sentToEmail: sendRes.sent,
+      emailConfigured: sendRes.configured,
     });
   } catch (err: any) {
     console.error("send-otp error:", err);

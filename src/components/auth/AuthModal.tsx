@@ -87,6 +87,37 @@ export const AuthModal: React.FC<AuthModalProps> = ({
 
   if (!isOpen) return null;
 
+  // Safe JSON API fetch wrapper preventing "Unexpected token" errors
+  const safeAuthFetch = async (url: string, options: RequestInit): Promise<any> => {
+    let res: Response;
+    try {
+      res = await fetch(url, options);
+    } catch {
+      throw new Error("Network connection error. Please verify your connection.");
+    }
+
+    const rawText = await res.text();
+    let data: any = null;
+
+    try {
+      data = JSON.parse(rawText);
+    } catch {
+      if (res.status === 404) {
+        throw new Error("Authentication route not found (404). Please ensure latest vercel.json is deployed.");
+      }
+      if (res.status >= 500) {
+        throw new Error(`Server error (${res.status}). If deployed on Vercel, check Serverless Function logs.`);
+      }
+      throw new Error(`Unexpected response (${res.status}): ${rawText.slice(0, 100)}`);
+    }
+
+    if (!res.ok || (data && data.success === false)) {
+      throw new Error(data?.error || `Request failed (${res.status})`);
+    }
+
+    return data;
+  };
+
   // 1. Send OTP helper
   const handleSendOtp = async (purpose: "signup" | "forgot_password") => {
     const cleanEmail = email.trim().toLowerCase();
@@ -115,16 +146,11 @@ export const AuthModal: React.FC<AuthModalProps> = ({
     setSuccessMsg(null);
 
     try {
-      const res = await fetch("/api/auth/send-otp", {
+      const data = await safeAuthFetch("/api/auth/send-otp", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email: cleanEmail, purpose }),
       });
-      const data = await res.json();
-
-      if (!res.ok || !data.success) {
-        throw new Error(data.error || "Failed to send verification code.");
-      }
 
       setResendCooldown(25);
       setSuccessMsg(data.message || `Verification code dispatched to ${cleanEmail}`);
@@ -159,7 +185,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
     setIsLoading(true);
 
     try {
-      const res = await fetch("/api/auth/signup", {
+      const data = await safeAuthFetch("/api/auth/signup", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -169,11 +195,6 @@ export const AuthModal: React.FC<AuthModalProps> = ({
           otp: cleanOtp,
         }),
       });
-
-      const data = await res.json();
-      if (!res.ok || !data.success) {
-        throw new Error(data.error || "Failed to complete signup. Please verify code.");
-      }
 
       setSuccessMsg("Account verified & created successfully! Welcome to AuraSpace.");
       setCurrentUser(data.user);
@@ -211,16 +232,11 @@ export const AuthModal: React.FC<AuthModalProps> = ({
     setIsLoading(true);
 
     try {
-      const res = await fetch("/api/auth/login", {
+      const data = await safeAuthFetch("/api/auth/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email: cleanEmail, password }),
       });
-
-      const data = await res.json();
-      if (!res.ok || !data.success) {
-        throw new Error(data.error || "Invalid credentials. Please verify your details.");
-      }
 
       setSuccessMsg("Welcome back! Loading your personal spatial workspace...");
       setCurrentUser(data.user);
@@ -253,16 +269,11 @@ export const AuthModal: React.FC<AuthModalProps> = ({
     setIsLoading(true);
 
     try {
-      const res = await fetch("/api/auth/login-otp", {
+      const data = await safeAuthFetch("/api/auth/login-otp", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email: cleanEmail, otp: cleanOtp }),
       });
-
-      const data = await res.json();
-      if (!res.ok || !data.success) {
-        throw new Error(data.error || "Failed to log in with code.");
-      }
 
       setSuccessMsg("Verification confirmed! Welcome back to AuraSpace.");
       setCurrentUser(data.user);
@@ -302,7 +313,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
     setIsLoading(true);
 
     try {
-      const res = await fetch("/api/auth/reset-password-otp", {
+      const data = await safeAuthFetch("/api/auth/reset-password-otp", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -311,11 +322,6 @@ export const AuthModal: React.FC<AuthModalProps> = ({
           newPassword,
         }),
       });
-
-      const data = await res.json();
-      if (!res.ok || !data.success) {
-        throw new Error(data.error || "Failed to reset password.");
-      }
 
       setSuccessMsg("Password reset successfully! Logging you in...");
       setCurrentUser(data.user);

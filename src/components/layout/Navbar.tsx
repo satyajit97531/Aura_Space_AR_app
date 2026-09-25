@@ -137,7 +137,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   return (
     <header
       id="auraspace-navbar"
-      className="h-14 px-2 sm:px-4 bg-stone-900/95 backdrop-blur-md border-b border-stone-800 flex items-center justify-between z-30 select-none text-stone-100 gap-2 min-w-0"
+      className="h-14 px-2 sm:px-4 bg-stone-900/95 backdrop-blur-md border-b border-stone-800 flex items-center justify-between relative z-40 select-none text-stone-100 gap-2 min-w-0"
     >
       {/* Brand Identity & Editable Project Name */}
       <div className="flex items-center gap-2 sm:gap-3 min-w-0 shrink">
@@ -472,92 +472,98 @@ export const Navbar: React.FC<NavbarProps> = ({
               </button>
 
               {isUserMenuOpen && (
-                <div
-                  id="navbar-account-dropdown"
-                  className="absolute right-0 mt-2 w-60 bg-stone-900 border border-stone-800 rounded-xl shadow-2xl p-2 z-50 animate-in fade-in zoom-in-95 duration-100 text-stone-200"
-                >
-                  <div className="px-3 py-2 border-b border-stone-800/80 mb-1">
-                    <p className="text-xs font-semibold text-white truncate">{currentUser.name}</p>
-                    <p className="text-[10px] text-stone-400 truncate">{currentUser.email}</p>
-                    {currentUser.username && (
-                      <p className="text-[10px] text-amber-400 font-mono mt-0.5">@{currentUser.username}</p>
-                    )}
+                <>
+                  <div
+                    className="fixed inset-0 z-40"
+                    onClick={() => setIsUserMenuOpen(false)}
+                  />
+                  <div
+                    id="navbar-account-dropdown"
+                    className="absolute right-0 mt-2 w-60 bg-stone-900 border border-stone-800 rounded-xl shadow-2xl p-2 z-50 animate-in fade-in zoom-in-95 duration-100 text-stone-200"
+                  >
+                    <div className="px-3 py-2 border-b border-stone-800/80 mb-1">
+                      <p className="text-xs font-semibold text-white truncate">{currentUser.name}</p>
+                      <p className="text-[10px] text-stone-400 truncate">{currentUser.email}</p>
+                      {currentUser.username && (
+                        <p className="text-[10px] text-amber-400 font-mono mt-0.5">@{currentUser.username}</p>
+                      )}
+                    </div>
+
+                    <button
+                      id="user-menu-profile-btn"
+                      onClick={() => {
+                        setIsUserMenuOpen(false);
+                        openPublicProfileTab("profile");
+                      }}
+                      className="w-full px-3 py-2 text-left text-xs rounded-lg hover:bg-stone-800 text-stone-300 hover:text-white flex items-center gap-2 transition-colors"
+                    >
+                      <User className="w-3.5 h-3.5 text-amber-400" />
+                      <span>Public Profile & Avatar</span>
+                    </button>
+
+                    <button
+                      id="user-menu-gallery-btn"
+                      onClick={() => {
+                        setIsUserMenuOpen(false);
+                        openPublicProfileTab("gallery");
+                      }}
+                      className="w-full px-3 py-2 text-left text-xs rounded-lg hover:bg-stone-800 text-stone-300 hover:text-white flex items-center gap-2 transition-colors"
+                    >
+                      <Globe className="w-3.5 h-3.5 text-amber-400" />
+                      <span>My Public Gallery</span>
+                    </button>
+
+                    <button
+                      id="user-menu-achievements-btn"
+                      onClick={() => {
+                        setIsUserMenuOpen(false);
+                        openPublicProfileTab("achievements");
+                      }}
+                      className="w-full px-3 py-2 text-left text-xs rounded-lg hover:bg-stone-800 text-stone-300 hover:text-white flex items-center gap-2 transition-colors"
+                    >
+                      <Trophy className="w-3.5 h-3.5 text-amber-400" />
+                      <span>Achievements & Badges</span>
+                    </button>
+
+                    <button
+                      id="user-menu-settings-btn"
+                      onClick={() => {
+                        setIsUserMenuOpen(false);
+                        setIsSettingsModalOpen(true);
+                      }}
+                      className="w-full px-3 py-2 text-left text-xs rounded-lg hover:bg-stone-800 text-stone-300 hover:text-white flex items-center gap-2 transition-colors"
+                    >
+                      <Settings className="w-3.5 h-3.5 text-amber-400" />
+                      <span>Settings & Units</span>
+                    </button>
+
+                    <button
+                      id="user-menu-projects-btn"
+                      onClick={() => {
+                        setIsUserMenuOpen(false);
+                        onOpenProjects();
+                      }}
+                      className="w-full px-3 py-2 text-left text-xs rounded-lg hover:bg-stone-800 text-stone-300 hover:text-white flex items-center gap-2 transition-colors"
+                    >
+                      <FolderOpen className="w-3.5 h-3.5 text-amber-400" />
+                      <span>My Saved Projects</span>
+                    </button>
+
+                    <div className="border-t border-stone-800/80 my-1" />
+
+                    <button
+                      id="user-menu-logout-btn"
+                      onClick={() => {
+                        setIsUserMenuOpen(false);
+                        logout();
+                      }}
+                      className="w-full px-3 py-2 text-left text-xs rounded-lg hover:bg-red-950/40 text-stone-300 hover:text-red-300 flex items-center gap-2 transition-colors"
+                    >
+                      <LogOut className="w-3.5 h-3.5 text-red-400" />
+                      <span>Sign Out</span>
+                    </button>
                   </div>
-
-                  <button
-                    id="user-menu-profile-btn"
-                    onClick={() => {
-                      setIsUserMenuOpen(false);
-                      openPublicProfileTab("profile");
-                    }}
-                    className="w-full px-3 py-2 text-left text-xs rounded-lg hover:bg-stone-800 text-stone-300 hover:text-white flex items-center gap-2 transition-colors"
-                  >
-                    <User className="w-3.5 h-3.5 text-amber-400" />
-                    <span>Public Profile & Avatar</span>
-                  </button>
-
-                  <button
-                    id="user-menu-gallery-btn"
-                    onClick={() => {
-                      setIsUserMenuOpen(false);
-                      openPublicProfileTab("gallery");
-                    }}
-                    className="w-full px-3 py-2 text-left text-xs rounded-lg hover:bg-stone-800 text-stone-300 hover:text-white flex items-center gap-2 transition-colors"
-                  >
-                    <Globe className="w-3.5 h-3.5 text-amber-400" />
-                    <span>My Public Gallery</span>
-                  </button>
-
-                  <button
-                    id="user-menu-achievements-btn"
-                    onClick={() => {
-                      setIsUserMenuOpen(false);
-                      openPublicProfileTab("achievements");
-                    }}
-                    className="w-full px-3 py-2 text-left text-xs rounded-lg hover:bg-stone-800 text-stone-300 hover:text-white flex items-center gap-2 transition-colors"
-                  >
-                    <Trophy className="w-3.5 h-3.5 text-amber-400" />
-                    <span>Achievements & Badges</span>
-                  </button>
-
-                  <button
-                    id="user-menu-settings-btn"
-                    onClick={() => {
-                      setIsUserMenuOpen(false);
-                      setIsSettingsModalOpen(true);
-                    }}
-                    className="w-full px-3 py-2 text-left text-xs rounded-lg hover:bg-stone-800 text-stone-300 hover:text-white flex items-center gap-2 transition-colors"
-                  >
-                    <Settings className="w-3.5 h-3.5 text-amber-400" />
-                    <span>Settings & Units</span>
-                  </button>
-
-                  <button
-                    id="user-menu-projects-btn"
-                    onClick={() => {
-                      setIsUserMenuOpen(false);
-                      onOpenProjects();
-                    }}
-                    className="w-full px-3 py-2 text-left text-xs rounded-lg hover:bg-stone-800 text-stone-300 hover:text-white flex items-center gap-2 transition-colors"
-                  >
-                    <FolderOpen className="w-3.5 h-3.5 text-amber-400" />
-                    <span>My Saved Projects</span>
-                  </button>
-
-                  <div className="border-t border-stone-800/80 my-1" />
-
-                  <button
-                    id="user-menu-logout-btn"
-                    onClick={() => {
-                      setIsUserMenuOpen(false);
-                      logout();
-                    }}
-                    className="w-full px-3 py-2 text-left text-xs rounded-lg hover:bg-red-950/40 text-stone-300 hover:text-red-300 flex items-center gap-2 transition-colors"
-                  >
-                    <LogOut className="w-3.5 h-3.5 text-red-400" />
-                    <span>Sign Out</span>
-                  </button>
-                </div>
+                </>
               )}
             </div>
           ) : (
@@ -591,10 +597,15 @@ export const Navbar: React.FC<NavbarProps> = ({
           </button>
 
           {isMobileToolsOpen && (
-            <div
-              id="navbar-mobile-tools-menu"
-              className="absolute right-0 mt-2 w-56 bg-stone-900 border border-stone-800 rounded-2xl shadow-2xl p-1.5 z-50 animate-in fade-in zoom-in-95 duration-100 text-stone-200 flex flex-col gap-0.5"
-            >
+            <>
+              <div
+                className="fixed inset-0 z-40"
+                onClick={() => setIsMobileToolsOpen(false)}
+              />
+              <div
+                id="navbar-mobile-tools-menu"
+                className="absolute right-0 mt-2 w-56 bg-stone-900 border border-stone-800 rounded-2xl shadow-2xl p-1.5 z-50 animate-in fade-in zoom-in-95 duration-100 text-stone-200 flex flex-col gap-0.5"
+              >
               <button
                 onClick={() => {
                   setIsMobileToolsOpen(false);
@@ -693,6 +704,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                 <span>Settings (Theme & Units)</span>
               </button>
             </div>
+            </>
           )}
         </div>
       </div>

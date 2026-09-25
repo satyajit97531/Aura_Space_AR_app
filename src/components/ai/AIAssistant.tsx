@@ -127,7 +127,7 @@ export const AIAssistant: React.FC<AIAssistantProps> = ({ isOpen, onClose }) => 
   return (
     <div
       id="ai-assistant-drawer"
-      className="fixed inset-y-0 right-0 z-40 w-full sm:w-[420px] bg-stone-900/98 backdrop-blur-xl border-l border-stone-800 shadow-2xl flex flex-col animate-in slide-in-from-right duration-200 text-stone-100"
+      className="fixed inset-y-0 right-0 z-50 w-full sm:w-[420px] bg-stone-900/98 backdrop-blur-xl border-l border-stone-800 shadow-2xl flex flex-col animate-in slide-in-from-right duration-200 text-stone-100"
     >
       {/* Header */}
       <div className="flex items-center justify-between p-4 border-b border-stone-800 shrink-0 bg-stone-900/90">

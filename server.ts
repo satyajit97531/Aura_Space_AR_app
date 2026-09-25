@@ -1,6 +1,7 @@
 import express from "express";
 import path from "path";
 import crypto from "crypto";
+import fs from "fs";
 import { MongoClient, ObjectId } from "mongodb";
 import { GoogleGenAI } from "@google/genai";
 import dotenv from "dotenv";
@@ -12,9 +13,10 @@ const app = express();
 
 app.use(express.json({ limit: "10mb" }));
 
-// MongoDB connection with fallback and robust URI sanitization
-const FALLBACK_MONGO_URI =
-  "mongodb+srv://samantasatyajit503:BvkGJFoH8dRgoBcr@cluster0.0hr5n8b.mongodb.net/Aura_Space?retryWrites=true&w=majority";
+// Password hashing helper
+function hashPassword(password: string): string {
+  return crypto.createHash("sha256").update(password + "auraspace_secure_salt_2026").digest("hex");
+}
 
 function sanitizeMongoUri(raw?: string): string | null {
   if (!raw || typeof raw !== "string") return null;
@@ -62,19 +64,457 @@ function sanitizeMongoUri(raw?: string): string | null {
   return null;
 }
 
-function getMongoUri(): string {
-  // Check MONGO_URI first, then MONGODB_URI, then FALLBACK
+function getMongoUri(): string | null {
+  // Check MONGO_URI first, then MONGODB_URI.
+  // Return null if none configured so we don't attempt broken connections.
   const uriFromMongo = sanitizeMongoUri(process.env.MONGO_URI);
   if (uriFromMongo) return uriFromMongo;
 
   const uriFromMongodb = sanitizeMongoUri(process.env.MONGODB_URI);
   if (uriFromMongodb) return uriFromMongodb;
 
-  return FALLBACK_MONGO_URI;
+  return null;
 }
 
+// Helper to match Mongo-like query filters in memory
+function matchValue(actual: any, target: any): boolean {
+  if (actual === target) return true;
+  if (actual == null || target == null) return false;
+  if (String(actual) === String(target)) return true;
+  return false;
+}
+
+function matchDoc(doc: any, filter: any): boolean {
+  if (!filter || Object.keys(filter).length === 0) return true;
+
+  if (Array.isArray(filter.$or)) {
+    return filter.$or.some((clause: any) => matchDoc(doc, clause));
+  }
+
+  for (const [key, expected] of Object.entries(filter)) {
+    if (key === "$or") continue;
+    if (key === "_id" || key === "id") {
+      const docId = doc._id || doc.id;
+      if (!matchValue(docId, expected) && !matchValue(doc.id, expected) && !matchValue(doc._id, expected)) {
+        return false;
+      }
+      continue;
+    }
+
+    if (key === "email" && typeof expected === "string" && typeof doc.email === "string") {
+      if (doc.email.toLowerCase() !== expected.toLowerCase()) return false;
+      continue;
+    }
+
+    if (expected && typeof expected === "object" && !Array.isArray(expected)) {
+      if (String(doc[key]) !== String(expected)) return false;
+    } else {
+      if (doc[key] !== expected) return false;
+    }
+  }
+
+  return true;
+}
+
+// Persistent local JSON file database for zero-downtime offline and fallback storage
+class LocalFileDatabase {
+  private filePath: string;
+  private data: { users: any[] };
+
+  constructor(filePath: string) {
+    this.filePath = filePath;
+    const dir = path.dirname(filePath);
+    if (!fs.existsSync(dir)) {
+      fs.mkdirSync(dir, { recursive: true });
+    }
+
+    if (fs.existsSync(filePath)) {
+      try {
+        const content = fs.readFileSync(filePath, "utf8");
+        this.data = JSON.parse(content);
+        if (!Array.isArray(this.data.users)) {
+          this.data.users = [];
+        }
+      } catch {
+        this.data = { users: [] };
+      }
+    } else {
+      this.data = { users: [] };
+    }
+
+    // Seed default showcase users if database is empty
+    if (this.data.users.length === 0) {
+      this.seedShowcaseData();
+      this.persist();
+    }
+  }
+
+  private seedShowcaseData() {
+    const now = new Date().toISOString();
+    const user1Id = "66f3b0e1a2c3d4e5f6071821";
+    const user2Id = "66f3b0e1a2c3d4e5f6071822";
+    const user3Id = "66f3b0e1a2c3d4e5f6071823";
+
+    this.data.users = [
+      {
+        _id: user1Id,
+        id: user1Id,
+        name: "Elena Rostova",
+        username: "elena_spatial",
+        email: "elena@auraspace.design",
+        password: hashPassword("auraspace123"),
+        createdAt: "2026-08-15T10:00:00.000Z",
+        lastLoginAt: now,
+        bio: "Spatial designer specializing in organic Japandi living spaces & natural materials.",
+        avatarUrl: "https://api.dicebear.com/7.x/identicon/svg?seed=elena_spatial",
+        badges: ["first_blueprint", "spatial_architect", "curator_choice"],
+        showcasedBadges: ["spatial_architect", "curator_choice"],
+        totalLikes: 42,
+        projects: [
+          {
+            id: "proj_showcase_japandi",
+            name: "Japandi Living Sanctuary",
+            userId: user1Id,
+            userEmail: "elena@auraspace.design",
+            userName: "Elena Rostova",
+            userAvatar: "https://api.dicebear.com/7.x/identicon/svg?seed=elena_spatial",
+            roomDimensions: { width: 7, length: 6, height: 2.8 },
+            colorPalette: {
+              id: "japandi_minimal",
+              name: "Japandi Stone & Linen",
+              wallColor: "#EFECE6",
+              floorColor: "#A89F91",
+              accentColor: "#22201D",
+              baseColor: "#DFD9CE",
+              floorTextureType: "marble",
+              wallTextureType: "matte",
+            },
+            placedObjects: [
+              {
+                id: "obj_jp_sofa",
+                name: "Three-Seater Curved Sofa",
+                category: "seating",
+                proceduralType: "modern_sofa",
+                position: [0, 0, 1.2],
+                rotation: [0, 0, 0],
+                dimensions: { width: 2.3, height: 0.82, depth: 0.95 },
+                color: "#DFD9CE",
+                accentColor: "#22201D",
+              },
+              {
+                id: "obj_jp_table",
+                name: "Organic Coffee Table",
+                category: "tables",
+                proceduralType: "coffee_table",
+                position: [0, 0, -0.2],
+                rotation: [0, 0, 0],
+                dimensions: { width: 1.2, height: 0.42, depth: 0.75 },
+                color: "#8C7B6B",
+                accentColor: "#3E3832",
+              },
+              {
+                id: "obj_jp_chair",
+                name: "Nordic Lounge Chair",
+                category: "seating",
+                proceduralType: "lounge_chair",
+                position: [-1.8, 0, 0.4],
+                rotation: [0, Math.PI / 4, 0],
+                dimensions: { width: 0.85, height: 0.78, depth: 0.82 },
+                color: "#C5BDB2",
+                accentColor: "#22201D",
+              },
+              {
+                id: "obj_jp_plant",
+                name: "Potted Monstera",
+                category: "decor",
+                proceduralType: "potted_monstera",
+                position: [2.8, 0, -2.2],
+                rotation: [0, 0, 0],
+                dimensions: { width: 0.65, height: 1.15, depth: 0.65 },
+                color: "#2D5A3F",
+                accentColor: "#D1C7BD",
+              },
+              {
+                id: "obj_jp_lamp",
+                name: "Minimalist Arch Lamp",
+                category: "lighting",
+                proceduralType: "floor_lamp",
+                position: [-2.6, 0, 1.8],
+                rotation: [0, -Math.PI / 6, 0],
+                dimensions: { width: 0.45, height: 1.95, depth: 0.85 },
+                color: "#22201D",
+                accentColor: "#F59E0B",
+              },
+            ],
+            notes: "Curated with harmonious balance, low visual center of gravity, and 1.2m circulation corridors.",
+            isPublic: true,
+            likesCount: 42,
+            likedBy: [],
+            comments: [
+              {
+                id: "comm_jp_1",
+                userId: "community_1",
+                userName: "Marcus V.",
+                userAvatar: "https://api.dicebear.com/7.x/identicon/svg?seed=Marcus",
+                text: "The circulation corridor around the coffee table feels exceptionally spacious!",
+                createdAt: "2026-08-16T14:22:00.000Z",
+              },
+            ],
+            createdAt: "2026-08-15T11:00:00.000Z",
+            updatedAt: "2026-08-15T11:00:00.000Z",
+          },
+        ],
+      },
+      {
+        _id: user2Id,
+        id: user2Id,
+        name: "Kaito Tanaka",
+        username: "kaito_design",
+        email: "kaito@auraspace.design",
+        password: hashPassword("auraspace123"),
+        createdAt: "2026-08-18T09:30:00.000Z",
+        lastLoginAt: now,
+        bio: "Creative technologist and minimalist interior designer based in Kyoto.",
+        avatarUrl: "https://api.dicebear.com/7.x/identicon/svg?seed=kaito_design",
+        badges: ["first_blueprint", "lighting_virtuoso"],
+        showcasedBadges: ["lighting_virtuoso"],
+        totalLikes: 38,
+        projects: [
+          {
+            id: "proj_showcase_nordic",
+            name: "Nordic Atelier & Creative Studio",
+            userId: user2Id,
+            userEmail: "kaito@auraspace.design",
+            userName: "Kaito Tanaka",
+            userAvatar: "https://api.dicebear.com/7.x/identicon/svg?seed=kaito_design",
+            roomDimensions: { width: 6.5, length: 5.5, height: 3.0 },
+            colorPalette: {
+              id: "nordic_oak",
+              name: "Nordic Warm Oak",
+              wallColor: "#F4F1EA",
+              floorColor: "#CBB69D",
+              accentColor: "#3B4A3F",
+              baseColor: "#EAE5DC",
+              floorTextureType: "oak_wood",
+              wallTextureType: "warm_plaster",
+            },
+            placedObjects: [
+              {
+                id: "obj_nd_desk",
+                name: "Solid Oak Work Desk",
+                category: "tables",
+                proceduralType: "work_desk",
+                position: [0, 0, -1.5],
+                rotation: [0, 0, 0],
+                dimensions: { width: 1.6, height: 0.75, depth: 0.8 },
+                color: "#CBB69D",
+                accentColor: "#3B4A3F",
+              },
+              {
+                id: "obj_nd_bookcase",
+                name: "Modular Open Bookshelf",
+                category: "storage",
+                proceduralType: "bookshelf",
+                position: [-2.4, 0, 0],
+                rotation: [0, Math.PI / 2, 0],
+                dimensions: { width: 1.4, height: 1.85, depth: 0.38 },
+                color: "#8C7862",
+                accentColor: "#F4F1EA",
+              },
+              {
+                id: "obj_nd_chair",
+                name: "Ergonomic Task Chair",
+                category: "seating",
+                proceduralType: "lounge_chair",
+                position: [0, 0, -0.7],
+                rotation: [0, Math.PI, 0],
+                dimensions: { width: 0.65, height: 0.92, depth: 0.65 },
+                color: "#3B4A3F",
+                accentColor: "#1F2822",
+              },
+            ],
+            notes: "Focused creative workspace with warm timber tones and plenty of storage.",
+            isPublic: true,
+            likesCount: 38,
+            likedBy: [],
+            comments: [],
+            createdAt: "2026-08-18T10:15:00.000Z",
+            updatedAt: "2026-08-18T10:15:00.000Z",
+          },
+        ],
+      },
+      {
+        _id: user3Id,
+        id: user3Id,
+        name: "Sofia Chen",
+        username: "sofia_terracotta",
+        email: "sofia@auraspace.design",
+        password: hashPassword("auraspace123"),
+        createdAt: "2026-08-20T12:00:00.000Z",
+        lastLoginAt: now,
+        bio: "Mediterranean architecture and warm atmospheric spatial design.",
+        avatarUrl: "https://api.dicebear.com/7.x/identicon/svg?seed=sofia_terracotta",
+        badges: ["first_blueprint", "material_master"],
+        showcasedBadges: ["material_master"],
+        totalLikes: 29,
+        projects: [
+          {
+            id: "proj_showcase_mediterranean",
+            name: "Mediterranean Sunlit Loft",
+            userId: user3Id,
+            userEmail: "sofia@auraspace.design",
+            userName: "Sofia Chen",
+            userAvatar: "https://api.dicebear.com/7.x/identicon/svg?seed=sofia_terracotta",
+            roomDimensions: { width: 8, length: 6, height: 3.2 },
+            colorPalette: {
+              id: "terracotta_med",
+              name: "Mediterranean Clay",
+              wallColor: "#FAF6F0",
+              floorColor: "#C97A5E",
+              accentColor: "#4A6B5C",
+              baseColor: "#EEDCD2",
+              floorTextureType: "slate_tile",
+              wallTextureType: "limewash",
+            },
+            placedObjects: [
+              {
+                id: "obj_med_bed",
+                name: "Minimal Platform Bed",
+                category: "bedroom",
+                proceduralType: "platform_bed",
+                position: [0, 0, -1.8],
+                rotation: [0, 0, 0],
+                dimensions: { width: 2.1, height: 0.65, depth: 2.2 },
+                color: "#EEDCD2",
+                accentColor: "#C97A5E",
+              },
+              {
+                id: "obj_med_armchair",
+                name: "Terracotta Accent Chair",
+                category: "seating",
+                proceduralType: "lounge_chair",
+                position: [2.5, 0, 0.8],
+                rotation: [0, -Math.PI / 4, 0],
+                dimensions: { width: 0.82, height: 0.78, depth: 0.8 },
+                color: "#C97A5E",
+                accentColor: "#FAF6F0",
+              },
+            ],
+            notes: "Warm terracotta floors reflecting golden hour sunlight with breathable lime-washed walls.",
+            isPublic: true,
+            likesCount: 29,
+            likedBy: [],
+            comments: [],
+            createdAt: "2026-08-20T13:00:00.000Z",
+            updatedAt: "2026-08-20T13:00:00.000Z",
+          },
+        ],
+      },
+    ];
+  }
+
+  private persist() {
+    try {
+      const tempPath = `${this.filePath}.tmp.${Date.now()}`;
+      fs.writeFileSync(tempPath, JSON.stringify(this.data, null, 2), "utf8");
+      fs.renameSync(tempPath, this.filePath);
+    } catch (e: any) {
+      console.warn("[AuraSpace] Notice writing local database file:", e.message);
+    }
+  }
+
+  collection(name: string) {
+    const self = this;
+    if (name === "users") {
+      return {
+        createIndex: async () => {},
+        findOne: async (filter: any) => {
+          return self.data.users.find((u) => matchDoc(u, filter)) || null;
+        },
+        find: (filter: any = {}) => {
+          const matched = self.data.users.filter((u) => matchDoc(u, filter));
+          return {
+            toArray: async () => JSON.parse(JSON.stringify(matched)),
+          };
+        },
+        insertOne: async (doc: any) => {
+          const insertedId = doc._id || crypto.randomBytes(12).toString("hex");
+          const newDoc = { ...doc, _id: insertedId, id: doc.id || insertedId };
+          self.data.users.push(newDoc);
+          self.persist();
+          return { insertedId };
+        },
+        updateOne: async (filter: any, update: any) => {
+          const doc = self.data.users.find((u) => matchDoc(u, filter));
+          if (!doc) {
+            return { matchedCount: 0, modifiedCount: 0 };
+          }
+          if (update.$set) {
+            Object.assign(doc, update.$set);
+          }
+          if (update.$addToSet) {
+            for (const [k, v] of Object.entries(update.$addToSet)) {
+              if (!Array.isArray(doc[k])) {
+                doc[k] = [];
+              }
+              if (!doc[k].includes(v)) {
+                doc[k].push(v);
+              }
+            }
+          }
+          self.persist();
+          return { matchedCount: 1, modifiedCount: 1 };
+        },
+        deleteOne: async (filter: any) => {
+          const prevLen = self.data.users.length;
+          self.data.users = self.data.users.filter((u) => !matchDoc(u, filter));
+          self.persist();
+          return { deletedCount: prevLen - self.data.users.length };
+        },
+      };
+    }
+
+    if (name === "projects") {
+      return {
+        drop: async () => {},
+        find: () => ({ toArray: async () => [] }),
+      };
+    }
+
+    return {
+      createIndex: async () => {},
+      findOne: async () => null,
+      find: () => ({ toArray: async () => [] }),
+      insertOne: async () => ({ insertedId: crypto.randomBytes(12).toString("hex") }),
+      updateOne: async () => ({ matchedCount: 0, modifiedCount: 0 }),
+      deleteOne: async () => ({ deletedCount: 0 }),
+      drop: async () => {},
+    };
+  }
+
+  async listCollections() {
+    return {
+      toArray: async () => [{ name: "users" }],
+    };
+  }
+
+  async command(_cmd: any) {
+    return { ok: 1 };
+  }
+}
+
+let localDbInstance: LocalFileDatabase | null = null;
+function getLocalFileDb(): LocalFileDatabase {
+  if (!localDbInstance) {
+    const dbPath = path.join(process.cwd(), "data", "auraspace_db.json");
+    localDbInstance = new LocalFileDatabase(dbPath);
+  }
+  return localDbInstance;
+}
+
+let activeDb: any = null;
+let mongoFailedCooldown = false;
 let mongoClient: MongoClient | null = null;
-let dbPromise: Promise<any> | null = null;
 
 // Permanently drop 'projects' collection and ensure projects are stored directly inside user documents
 async function ensureProjectsCollectionRemoved(db: any) {
@@ -119,9 +559,8 @@ async function ensureProjectsCollectionRemoved(db: any) {
         console.warn("Could not read projects collection before dropping:", readErr.message);
       }
 
-      // Drop the projects collection permanently from database
       await db.collection("projects").drop();
-      console.log("SUCCESS: 'projects' collection has been dropped from database. All projects are stored inside user documents.");
+      console.log("SUCCESS: 'projects' collection dropped. All projects are stored inside user documents.");
     }
   } catch (err: any) {
     if (!err.message?.includes("ns not found")) {
@@ -130,53 +569,46 @@ async function ensureProjectsCollectionRemoved(db: any) {
   }
 }
 
-async function getDb() {
-  if (dbPromise) {
-    return dbPromise;
+async function getDb(): Promise<any> {
+  if (activeDb) {
+    return activeDb;
   }
 
   const uri = getMongoUri();
-  try {
-    mongoClient = new MongoClient(uri, {
-      connectTimeoutMS: 8000,
-      serverSelectionTimeoutMS: 8000,
-    });
-
-    dbPromise = mongoClient
-      .connect()
-      .then(async (client) => {
-        const db = client.db("Aura_Space");
-        // Ensure unique index for user emails in the users collection
-        try {
-          await db.collection("users").createIndex({ email: 1 }, { unique: true });
-        } catch (e: any) {
-          console.warn("Index creation notice:", e.message);
-        }
-
-        // Permanently drop 'projects' collection and store projects inside specific user
-        await ensureProjectsCollectionRemoved(db);
-
-        return db;
-      })
-      .catch((err) => {
-        // Reset cached promise so next request can retry instead of permanently failing
-        dbPromise = null;
-        mongoClient = null;
-        console.error("MongoDB connection failed:", err.message);
-        throw err;
+  if (uri && !mongoFailedCooldown) {
+    try {
+      console.log("[AuraSpace] Attempting MongoDB Atlas connection...");
+      mongoClient = new MongoClient(uri, {
+        connectTimeoutMS: 4000,
+        serverSelectionTimeoutMS: 4000,
       });
 
-    return await dbPromise;
-  } catch (err: any) {
-    dbPromise = null;
-    mongoClient = null;
-    throw err;
-  }
-}
+      await mongoClient.connect();
+      const mongoDb = mongoClient.db("Aura_Space");
 
-// Password hashing helper
-function hashPassword(password: string): string {
-  return crypto.createHash("sha256").update(password + "auraspace_secure_salt_2026").digest("hex");
+      try {
+        await mongoDb.collection("users").createIndex({ email: 1 }, { unique: true });
+      } catch {
+        // ignore
+      }
+
+      await ensureProjectsCollectionRemoved(mongoDb);
+
+      console.log("[AuraSpace] MongoDB connected successfully.");
+      activeDb = mongoDb;
+      return activeDb;
+    } catch (err: any) {
+      console.log(`[AuraSpace] Notice: MongoDB connection not available (${err.message}). Using persistent local storage.`);
+      mongoFailedCooldown = true;
+      setTimeout(() => {
+        mongoFailedCooldown = false;
+      }, 5 * 60 * 1000);
+    }
+  }
+
+  // Use persistent local file database
+  activeDb = getLocalFileDb();
+  return activeDb;
 }
 
 // Lazy Gemini AI initialization
@@ -197,12 +629,14 @@ function getAiClient() {
 
 // 1. Health check
 app.get("/api/health", async (req, res) => {
-  let mongoStatus = "disconnected";
+  let isMongo = false;
+  let mongoStatus = "local_file_store";
   try {
     const db = await getDb();
     if (db) {
       await db.command({ ping: 1 });
-      mongoStatus = "connected";
+      isMongo = Boolean(mongoClient && activeDb && activeDb !== localDbInstance);
+      mongoStatus = isMongo ? "connected" : "local_file_store";
     }
   } catch (err: any) {
     mongoStatus = `error: ${err.message}`;
@@ -212,6 +646,7 @@ app.get("/api/health", async (req, res) => {
     status: "ok",
     app: "AuraSpace",
     mongodb: mongoStatus,
+    storage: isMongo ? "mongodb_cloud" : "persistent_local_json",
     geminiConfigured: Boolean(process.env.GEMINI_API_KEY),
   });
 });
@@ -577,7 +1012,7 @@ app.get("/api/projects", async (req, res) => {
       projects,
     });
   } catch (err: any) {
-    console.warn("MongoDB fetch projects error:", err.message);
+    console.warn("Fetch projects notice:", err.message);
     res.status(200).json({
       success: false,
       error: err.message,
@@ -662,7 +1097,7 @@ app.post("/api/projects", async (req, res) => {
       project: doc,
     });
   } catch (err: any) {
-    console.warn("MongoDB save project error:", err.message);
+    console.warn("Save project notice:", err.message);
     res.status(200).json({
       success: false,
       error: err.message,
@@ -768,7 +1203,7 @@ app.delete("/api/projects/:id", async (req, res) => {
 
     res.json({ success: true });
   } catch (err: any) {
-    console.warn("Delete project server warning:", err.message);
+    console.warn("Delete project notice:", err.message);
     res.json({ success: true, note: "Deleted locally or DB offline" });
   }
 });
@@ -1273,6 +1708,10 @@ async function setupViteOrStatic() {
   });
 }
 
-setupViteOrStatic().catch((err) => {
-  console.error("Failed to start server:", err);
-});
+if (!process.env.VERCEL) {
+  setupViteOrStatic().catch((err) => {
+    console.error("Failed to start server:", err);
+  });
+}
+
+export default app;

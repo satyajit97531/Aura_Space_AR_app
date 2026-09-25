@@ -91,13 +91,13 @@ export const CatalogSidebar: React.FC = () => {
       {/* Mobile / Tablet Overlay Backdrop */}
       {!isCollapsed && (
         <div
-          className="lg:hidden fixed inset-0 top-14 bg-black/60 backdrop-blur-xs z-30 transition-opacity"
+          className="lg:hidden fixed inset-0 top-14 bg-black/60 backdrop-blur-xs z-20 transition-opacity"
           onClick={() => setIsCollapsed(true)}
         />
       )}
       <aside
         id="auraspace-catalog-sidebar"
-        className={`h-full bg-stone-900/95 backdrop-blur-xl border-r border-stone-800 transition-all duration-200 flex flex-col select-none text-stone-100 z-40 shrink-0 max-lg:fixed max-lg:top-14 max-lg:bottom-0 max-lg:left-0 max-lg:shadow-2xl ${
+        className={`h-full bg-stone-900/95 backdrop-blur-xl border-r border-stone-800 transition-all duration-200 flex flex-col select-none text-stone-100 z-30 shrink-0 max-lg:fixed max-lg:top-14 max-lg:bottom-0 max-lg:left-0 max-lg:shadow-2xl ${
           isCollapsed ? "max-lg:-translate-x-full lg:w-14" : "w-80 max-w-[88vw]"
         }`}
       >
@@ -105,7 +105,7 @@ export const CatalogSidebar: React.FC = () => {
       <button
         id="toggle-sidebar-collapse-btn"
         onClick={() => setIsCollapsed(!isCollapsed)}
-        className="absolute -right-3.5 top-16 z-30 p-1 rounded-full bg-stone-800 border border-stone-700 text-stone-300 hover:text-white shadow-md transition-colors"
+        className="absolute -right-3.5 top-16 z-20 p-1 rounded-full bg-stone-800 border border-stone-700 text-stone-300 hover:text-white shadow-md transition-colors"
         title={isCollapsed ? "Expand Catalog" : "Collapse Catalog"}
       >
         {isCollapsed ? (

@@ -1116,28 +1116,33 @@ app.post("/api/auth/signup", async (req, res) => {
       });
     }
 
-    // Verify OTP code if provided
-    if (otp) {
-      const record = await getOtpRecord(cleanEmail, "signup");
-      if (!record || Date.now() > record.expiresAt) {
-        return res.status(400).json({
-          success: false,
-          error: "Email verification code expired or not requested. Please request a new code.",
-        });
-      }
-
-      if (String(otp).trim() !== record.code) {
-        record.attempts = (record.attempts || 0) + 1;
-        await saveOtpRecord(record);
-        return res.status(400).json({
-          success: false,
-          error: "Invalid email verification code. Please check your email or request a new code.",
-        });
-      }
-
-      // Consume OTP once successfully registered
-      await deleteOtpRecord(cleanEmail, "signup");
+    // Verify OTP code is required for account creation
+    if (!otp) {
+      return res.status(400).json({
+        success: false,
+        error: "Verification code is required. Please click 'Send Verification Code' to verify your email first.",
+      });
     }
+
+    const record = await getOtpRecord(cleanEmail, "signup");
+    if (!record || Date.now() > record.expiresAt) {
+      return res.status(400).json({
+        success: false,
+        error: "Email verification code expired or not requested. Please request a new code.",
+      });
+    }
+
+    if (String(otp).trim() !== record.code) {
+      record.attempts = (record.attempts || 0) + 1;
+      await saveOtpRecord(record);
+      return res.status(400).json({
+        success: false,
+        error: "Invalid email verification code. Please check your email or request a new code.",
+      });
+    }
+
+    // Consume OTP once successfully registered
+    await deleteOtpRecord(cleanEmail, "signup");
 
     const db = await getDb();
     const existing = await db.collection("users").findOne({ email: cleanEmail });

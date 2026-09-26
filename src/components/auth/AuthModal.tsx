@@ -157,10 +157,10 @@ export const AuthModal: React.FC<AuthModalProps> = ({
       setResendCooldown(25);
       if (data.devOtp) {
         setDevOtp(String(data.devOtp));
-        setOtp(String(data.devOtp));
       } else {
         setDevOtp(null);
       }
+      setOtp("");
       setSuccessMsg(data.message || `Verification code dispatched to ${cleanEmail}`);
       if (purpose === "signup") {
         setSignupStep("otp");
@@ -584,20 +584,41 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                   <span>Signing In...</span>
                 </>
               ) : (
-                <span>Sign In to Private Account</span>
+                <span>Sign In with Password</span>
               )}
+            </button>
+
+            <div className="flex items-center gap-2 pt-2">
+              <div className="flex-1 h-px bg-stone-800" />
+              <span className="text-[10px] text-stone-500 uppercase tracking-wider">or sign in with OTP</span>
+              <div className="flex-1 h-px bg-stone-800" />
+            </div>
+
+            <button
+              id="login-with-otp-btn"
+              type="button"
+              onClick={() => {
+                setMode("forgot");
+                setForgotStep("request");
+                setError(null);
+                setSuccessMsg(null);
+              }}
+              className="w-full py-2.5 px-4 bg-stone-900 hover:bg-stone-800 border border-stone-800 hover:border-stone-700 text-stone-300 hover:text-stone-100 font-medium rounded-xl text-xs flex items-center justify-center gap-2 transition-all active:scale-[0.99]"
+            >
+              <KeyRound className="w-3.5 h-3.5 text-amber-400" />
+              <span>Sign In with 6-Digit Email OTP Code</span>
             </button>
           </form>
         )}
 
         {/* ======================================================== */}
-        {/* MODE 2: SIGNUP                                           */}
+        {/* MODE 2: SIGNUP (OTP VERIFIED)                            */}
         {/* ======================================================== */}
         {mode === "signup" && signupStep === "details" && (
           <form
             onSubmit={(e) => {
               e.preventDefault();
-              handleDirectSignup();
+              handleSendOtp("signup");
             }}
             className="p-5 space-y-4"
           >
@@ -619,7 +640,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
 
             <div>
               <label className="block text-xs font-medium text-stone-300 mb-1.5">
-                Email Address
+                Email Address (For 6-Digit Verification Code)
               </label>
               <div className="relative">
                 <Mail className="w-4 h-4 text-stone-500 absolute left-3 top-1/2 -translate-y-1/2" />
@@ -637,7 +658,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                 />
               </div>
               <p className="text-[10px] text-stone-500 mt-1">
-                Your email is used to log in securely and link your private 3D designs.
+                A 6-digit one-time verification code will be generated to verify this email address.
               </p>
             </div>
 
@@ -665,9 +686,9 @@ export const AuthModal: React.FC<AuthModalProps> = ({
               </div>
             </div>
 
-            {/* Primary Action: Direct Account Creation */}
+            {/* Primary Action: Send OTP */}
             <button
-              id="signup-submit-btn"
+              id="signup-send-otp-btn"
               type="submit"
               disabled={isLoading}
               className="w-full mt-2 py-3 px-4 bg-amber-500 hover:bg-amber-400 disabled:opacity-50 text-stone-950 font-semibold rounded-xl text-xs flex items-center justify-center gap-2 shadow-lg shadow-amber-500/10 transition-all active:scale-[0.99]"
@@ -675,29 +696,11 @@ export const AuthModal: React.FC<AuthModalProps> = ({
               {isLoading ? (
                 <>
                   <Loader2 className="w-4 h-4 animate-spin" />
-                  <span>Creating Account...</span>
+                  <span>Generating & Sending Verification Code...</span>
                 </>
               ) : (
-                <span>Create Account</span>
+                <span>Send 6-Digit Email Verification Code</span>
               )}
-            </button>
-
-            <div className="flex items-center gap-2 pt-1">
-              <div className="flex-1 h-px bg-stone-800" />
-              <span className="text-[10px] text-stone-500 uppercase tracking-wider">or optional</span>
-              <div className="flex-1 h-px bg-stone-800" />
-            </div>
-
-            {/* Secondary Action: Email Verification flow */}
-            <button
-              id="signup-send-otp-btn"
-              type="button"
-              disabled={isLoading}
-              onClick={() => handleSendOtp("signup")}
-              className="w-full py-2.5 px-4 bg-stone-900 hover:bg-stone-800 border border-stone-800 hover:border-stone-700 text-stone-400 hover:text-stone-200 font-medium rounded-xl text-xs flex items-center justify-center gap-2 transition-all active:scale-[0.99]"
-            >
-              <Mail className="w-3.5 h-3.5 text-amber-400" />
-              <span>Verify with 6-Digit Email Code</span>
             </button>
           </form>
         )}
@@ -726,14 +729,14 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-1.5 text-amber-400 font-semibold text-xs">
                     <Sparkles className="w-3.5 h-3.5" />
-                    <span>Auto-Generated Verification Code</span>
+                    <span>Your 6-Digit OTP Code</span>
                   </div>
-                  <span className="font-mono text-base font-bold text-amber-300 tracking-wider bg-amber-500/20 px-2 py-0.5 rounded border border-amber-500/30">
+                  <span className="font-mono text-base font-bold text-amber-300 tracking-wider bg-amber-500/20 px-2.5 py-0.5 rounded border border-amber-500/30">
                     {devOtp}
                   </span>
                 </div>
                 <p className="text-[11px] text-stone-400 leading-relaxed">
-                  No email provider (SMTP/Resend) is connected to this server yet, so emails cannot be delivered to real inboxes. Your code has been <strong>automatically filled in</strong> below so you can proceed immediately.
+                  Enter this 6-digit code in the box below to verify your email and activate your account.
                 </p>
                 <button
                   type="button"
@@ -741,7 +744,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                   className="w-full py-1.5 px-3 bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 font-medium rounded-lg text-xs transition-colors flex items-center justify-center gap-1.5"
                 >
                   <CheckCircle2 className="w-3.5 h-3.5" />
-                  <span>Auto-fill code ({devOtp})</span>
+                  <span>Insert code ({devOtp})</span>
                 </button>
               </div>
             )}
@@ -791,17 +794,6 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                 <span>Verify & Activate Account</span>
               )}
             </button>
-
-            <div className="pt-1 text-center">
-              <button
-                id="signup-skip-to-direct-btn"
-                type="button"
-                onClick={handleDirectSignup}
-                className="text-[11px] text-stone-400 hover:text-amber-400 transition-colors"
-              >
-                No email arrived? Skip email code & create account immediately &rarr;
-              </button>
-            </div>
           </form>
         )}
 

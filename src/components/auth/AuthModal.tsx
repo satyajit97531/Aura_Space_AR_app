@@ -57,6 +57,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   const [password, setPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [otp, setOtp] = useState("");
+  const [devOtp, setDevOtp] = useState<string | null>(null);
   const [showPassword, setShowPassword] = useState(false);
   const [showNewPassword, setShowNewPassword] = useState(false);
 
@@ -73,6 +74,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
     setError(null);
     setSuccessMsg(null);
     setOtp("");
+    setDevOtp(null);
     setResendCooldown(0);
   }, [initialMode, isOpen]);
 
@@ -153,6 +155,11 @@ export const AuthModal: React.FC<AuthModalProps> = ({
       });
 
       setResendCooldown(25);
+      if (data.devOtp) {
+        setDevOtp(String(data.devOtp));
+      } else {
+        setDevOtp(null);
+      }
       setSuccessMsg(data.message || `Verification code dispatched to ${cleanEmail}`);
       if (purpose === "signup") {
         setSignupStep("otp");
@@ -163,6 +170,58 @@ export const AuthModal: React.FC<AuthModalProps> = ({
     } catch (err: any) {
       setError(err.message || "Could not send verification code. Please try again.");
       return false;
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // 1b. Direct Instant Signup without OTP
+  const handleDirectSignup = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    const cleanEmail = email.trim().toLowerCase();
+    const cleanName = name.trim();
+
+    if (!cleanName) {
+      setError("Please enter your full name.");
+      return;
+    }
+    if (!cleanEmail || !validateEmail(cleanEmail)) {
+      setError("Please enter a valid email address.");
+      return;
+    }
+    if (password.length < 6) {
+      setError("Password must be at least 6 characters.");
+      return;
+    }
+
+    setIsLoading(true);
+    setError(null);
+    setSuccessMsg(null);
+
+    try {
+      const data = await safeAuthFetch("/api/auth/signup", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: cleanName,
+          email: cleanEmail,
+          password,
+        }),
+      });
+
+      setSuccessMsg("Account created successfully! Welcome to AuraSpace.");
+      setCurrentUser(data.user);
+
+      setTimeout(() => {
+        onClose();
+        setName("");
+        setPassword("");
+        setOtp("");
+        setDevOtp(null);
+        setSuccessMsg(null);
+      }, 700);
+    } catch (err: any) {
+      setError(err.message || "Failed to create account. Please try again.");
     } finally {
       setIsLoading(false);
     }
@@ -620,6 +679,23 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                 <span>Send 6-Digit Email Verification Code</span>
               )}
             </button>
+
+            <div className="flex items-center gap-2 pt-1">
+              <div className="flex-1 h-px bg-stone-800" />
+              <span className="text-[10px] text-stone-500 uppercase tracking-wider">or instant setup</span>
+              <div className="flex-1 h-px bg-stone-800" />
+            </div>
+
+            <button
+              id="signup-direct-btn"
+              type="button"
+              disabled={isLoading}
+              onClick={handleDirectSignup}
+              className="w-full py-2.5 px-4 bg-stone-900 hover:bg-stone-800 border border-stone-800 hover:border-stone-700 text-stone-300 hover:text-stone-100 font-medium rounded-xl text-xs flex items-center justify-center gap-2 transition-all active:scale-[0.99]"
+            >
+              <ShieldCheck className="w-3.5 h-3.5 text-amber-400" />
+              <span>Create Account Instantly (No Email Code)</span>
+            </button>
           </form>
         )}
 
@@ -641,6 +717,31 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                 Change Email
               </button>
             </div>
+
+            {devOtp && (
+              <div className="p-3 bg-amber-500/10 border border-amber-500/30 rounded-xl space-y-2 animate-in fade-in">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-1.5 text-amber-400 font-semibold text-xs">
+                    <Sparkles className="w-3.5 h-3.5" />
+                    <span>Your Verification Code</span>
+                  </div>
+                  <span className="font-mono text-base font-bold text-amber-300 tracking-wider bg-amber-500/20 px-2 py-0.5 rounded border border-amber-500/30">
+                    {devOtp}
+                  </span>
+                </div>
+                <p className="text-[11px] text-stone-400 leading-relaxed">
+                  Email service is not yet configured in environment variables. You can enter or auto-fill this code to activate your account.
+                </p>
+                <button
+                  type="button"
+                  onClick={() => setOtp(devOtp)}
+                  className="w-full py-1.5 px-3 bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 font-medium rounded-lg text-xs transition-colors flex items-center justify-center gap-1.5"
+                >
+                  <CheckCircle2 className="w-3.5 h-3.5" />
+                  <span>Auto-fill code ({devOtp})</span>
+                </button>
+              </div>
+            )}
 
             <div>
               <label className="block text-xs font-medium text-stone-300 mb-1.5">
@@ -774,6 +875,31 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                 Change Email
               </button>
             </div>
+
+            {devOtp && (
+              <div className="p-3 bg-amber-500/10 border border-amber-500/30 rounded-xl space-y-2 animate-in fade-in">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-1.5 text-amber-400 font-semibold text-xs">
+                    <Sparkles className="w-3.5 h-3.5" />
+                    <span>Your One-Time Code</span>
+                  </div>
+                  <span className="font-mono text-base font-bold text-amber-300 tracking-wider bg-amber-500/20 px-2 py-0.5 rounded border border-amber-500/30">
+                    {devOtp}
+                  </span>
+                </div>
+                <p className="text-[11px] text-stone-400 leading-relaxed">
+                  Email service is not yet configured in environment variables. You can enter or auto-fill this code to log in or reset your password.
+                </p>
+                <button
+                  type="button"
+                  onClick={() => setOtp(devOtp)}
+                  className="w-full py-1.5 px-3 bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 font-medium rounded-lg text-xs transition-colors flex items-center justify-center gap-1.5"
+                >
+                  <CheckCircle2 className="w-3.5 h-3.5" />
+                  <span>Auto-fill code ({devOtp})</span>
+                </button>
+              </div>
+            )}
 
             <div>
               <label className="block text-xs font-medium text-stone-300 mb-1.5">

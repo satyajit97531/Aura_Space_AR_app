@@ -12,6 +12,7 @@ import { MobileARView } from "./components/ar/MobileARView";
 import { AuthModal } from "./components/auth/AuthModal";
 import { SettingsModal } from "./components/modals/SettingsModal";
 import { ProfileModal } from "./components/modals/ProfileModal";
+import { SignOutConfirmModal } from "./components/modals/SignOutConfirmModal";
 import { useStore, applyThemeToDocument } from "./store/useStore";
 import { Layers, Plus, FolderOpen } from "lucide-react";
 
@@ -224,6 +225,7 @@ export default function App() {
             onClose={() => setIsProfileModalOpen(false)}
             initialTab={profileModalTab}
           />
+          <SignOutConfirmModal />
         </>
       )}
     </div>

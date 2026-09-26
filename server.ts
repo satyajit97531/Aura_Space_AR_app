@@ -85,20 +85,27 @@ if (typeof otpCleanupInterval?.unref === "function") {
 let mailTransporter: any = null;
 function getMailTransporter() {
   if (mailTransporter) return mailTransporter;
-  const host = process.env.SMTP_HOST || (process.env.GMAIL_USER ? "smtp.gmail.com" : undefined);
   const user = process.env.SMTP_USER || process.env.GMAIL_USER;
-  const pass = process.env.SMTP_PASS || process.env.GMAIL_APP_PASSWORD;
-  const port = parseInt(process.env.SMTP_PORT || (host === "smtp.gmail.com" ? "587" : "587"), 10);
+  const pass = process.env.SMTP_PASS || process.env.GMAIL_APP_PASSWORD || process.env.GMAIL_PASS;
+  const host = process.env.SMTP_HOST || (user && user.includes("@gmail.com") ? "smtp.gmail.com" : undefined);
+  const port = parseInt(process.env.SMTP_PORT || (host === "smtp.gmail.com" ? "465" : "587"), 10);
   const secure = process.env.SMTP_SECURE === "true" || port === 465;
 
   if (user && pass) {
-    mailTransporter = nodemailer.createTransport({
-      host: host || "smtp.gmail.com",
-      port,
-      secure,
-      auth: { user, pass },
-      tls: { rejectUnauthorized: false },
-    });
+    if (host === "smtp.gmail.com" || (user && user.includes("@gmail.com"))) {
+      mailTransporter = nodemailer.createTransport({
+        service: "gmail",
+        auth: { user, pass },
+      });
+    } else {
+      mailTransporter = nodemailer.createTransport({
+        host: host || "smtp.gmail.com",
+        port,
+        secure,
+        auth: { user, pass },
+        tls: { rejectUnauthorized: false },
+      });
+    }
   }
   return mailTransporter;
 }
@@ -302,11 +309,11 @@ function matchDoc(doc: any, filter: any): boolean {
 // Persistent local JSON file database for zero-downtime offline and fallback storage
 class LocalFileDatabase {
   private filePath: string;
-  private data: { users: any[] };
+  private data: { users: any[]; otps?: any[] };
 
   constructor(filePath: string) {
     this.filePath = filePath;
-    this.data = { users: [] };
+    this.data = { users: [], otps: [] };
 
     try {
       const dir = path.dirname(filePath);
@@ -319,6 +326,9 @@ class LocalFileDatabase {
         const parsed = JSON.parse(content);
         if (Array.isArray(parsed?.users)) {
           this.data = parsed;
+          if (!Array.isArray(this.data.otps)) {
+            this.data.otps = [];
+          }
         }
       }
     } catch (e: any) {
@@ -668,6 +678,56 @@ class LocalFileDatabase {
       };
     }
 
+    if (name === "otps") {
+      if (!Array.isArray(self.data.otps)) {
+        self.data.otps = [];
+      }
+      return {
+        createIndex: async () => {},
+        findOne: async (filter: any) => {
+          return self.data.otps!.find((o) => matchDoc(o, filter)) || null;
+        },
+        find: (filter: any = {}) => {
+          const matched = self.data.otps!.filter((o) => matchDoc(o, filter));
+          return {
+            toArray: async () => JSON.parse(JSON.stringify(matched)),
+          };
+        },
+        insertOne: async (doc: any) => {
+          const insertedId = doc._id || crypto.randomBytes(12).toString("hex");
+          const newDoc = { ...doc, _id: insertedId };
+          self.data.otps!.push(newDoc);
+          self.persist();
+          return { insertedId };
+        },
+        updateOne: async (filter: any, update: any, options?: { upsert?: boolean }) => {
+          let doc = self.data.otps!.find((o) => matchDoc(o, filter));
+          if (!doc) {
+            if (options?.upsert) {
+              const insertedId = crypto.randomBytes(12).toString("hex");
+              const newDoc: any = { _id: insertedId, ...filter };
+              if (update.$set) Object.assign(newDoc, update.$set);
+              self.data.otps!.push(newDoc);
+              self.persist();
+              return { matchedCount: 0, modifiedCount: 1, upsertedId: insertedId };
+            }
+            return { matchedCount: 0, modifiedCount: 0 };
+          }
+          if (update.$set) {
+            Object.assign(doc, update.$set);
+          }
+          self.persist();
+          return { matchedCount: 1, modifiedCount: 1 };
+        },
+        deleteOne: async (filter: any) => {
+          const prevLen = self.data.otps!.length;
+          self.data.otps = self.data.otps!.filter((o) => !matchDoc(o, filter));
+          self.persist();
+          return { deletedCount: prevLen - self.data.otps!.length };
+        },
+      };
+    }
+
     return {
       createIndex: async () => {},
       findOne: async () => null,
@@ -847,6 +907,62 @@ app.get("/api/health", async (req, res) => {
 
 // 2. User Authentication API (Strict Email Validation, Nodemailer Email OTP & Passwordless Login)
 
+async function getOtpRecord(cleanEmail: string, purpose: "signup" | "forgot_password"): Promise<OtpRecord | null> {
+  const cacheKey = `${cleanEmail}::${purpose}`;
+  const inMemory = otpStore.get(cacheKey);
+  if (inMemory && inMemory.expiresAt > Date.now()) {
+    return inMemory;
+  }
+
+  try {
+    const db = await getDb();
+    const doc = await db.collection("otps").findOne({ email: cleanEmail, purpose });
+    if (doc) {
+      const rec: OtpRecord = {
+        code: String(doc.code),
+        email: doc.email,
+        purpose: doc.purpose,
+        expiresAt: Number(doc.expiresAt),
+        attempts: Number(doc.attempts || 0),
+        createdAt: Number(doc.createdAt || Date.now()),
+      };
+      if (rec.expiresAt > Date.now()) {
+        otpStore.set(cacheKey, rec);
+        return rec;
+      }
+    }
+  } catch (e: any) {
+    console.warn("[AuraSpace Auth] Notice checking database OTP:", e.message);
+  }
+  return null;
+}
+
+async function saveOtpRecord(record: OtpRecord): Promise<void> {
+  const cacheKey = `${record.email}::${record.purpose}`;
+  otpStore.set(cacheKey, record);
+  try {
+    const db = await getDb();
+    await db.collection("otps").updateOne(
+      { email: record.email, purpose: record.purpose },
+      { $set: record },
+      { upsert: true }
+    );
+  } catch (e: any) {
+    console.warn("[AuraSpace Auth] Notice persisting OTP:", e.message);
+  }
+}
+
+async function deleteOtpRecord(cleanEmail: string, purpose: "signup" | "forgot_password"): Promise<void> {
+  const cacheKey = `${cleanEmail}::${purpose}`;
+  otpStore.delete(cacheKey);
+  try {
+    const db = await getDb();
+    await db.collection("otps").deleteOne({ email: cleanEmail, purpose });
+  } catch (e: any) {
+    console.warn("[AuraSpace Auth] Notice deleting OTP:", e.message);
+  }
+}
+
 // Send OTP to email for signup or password recovery
 app.post("/api/auth/send-otp", async (req, res) => {
   try {
@@ -891,28 +1007,30 @@ app.post("/api/auth/send-otp", async (req, res) => {
     }
 
     const otpCode = crypto.randomInt(100000, 999999).toString();
-    otpStore.set(cacheKey, {
+    const record: OtpRecord = {
       code: otpCode,
       email: cleanEmail,
       purpose: cleanPurpose,
       expiresAt: now + 10 * 60 * 1000, // 10 minutes
       attempts: 0,
       createdAt: now,
-    });
+    };
+    await saveOtpRecord(record);
 
     const sendRes = await sendOtpEmail(cleanEmail, otpCode, cleanPurpose);
 
     const message = sendRes.sent
       ? `A 6-digit verification code has been dispatched to ${cleanEmail}. Please check your inbox and spam folder.`
       : sendRes.configured
-      ? `Email dispatch issue: ${sendRes.error || "Please verify your email credentials."}`
-      : `Verification code generated for ${cleanEmail}. Notice: Configure your email provider (SMTP/Resend) in Vercel to receive emails in real inboxes.`;
+      ? `Email dispatch notice (${sendRes.error || "provider error"}). For your convenience, your code is displayed on screen.`
+      : `Email service is not yet configured in Vercel environment variables. For convenience, your code is displayed on screen.`;
 
     res.json({
       success: true,
       message,
       sentToEmail: sendRes.sent,
       emailConfigured: sendRes.configured,
+      devOtp: !sendRes.sent ? otpCode : undefined,
     });
   } catch (err: any) {
     console.error("send-otp error:", err);
@@ -930,8 +1048,7 @@ app.post("/api/auth/verify-otp", async (req, res) => {
 
     const cleanEmail = String(email).trim().toLowerCase();
     const cleanPurpose = purpose === "forgot_password" ? "forgot_password" : "signup";
-    const cacheKey = `${cleanEmail}::${cleanPurpose}`;
-    const record = otpStore.get(cacheKey);
+    const record = await getOtpRecord(cleanEmail, cleanPurpose);
 
     if (!record) {
       return res.status(400).json({
@@ -941,7 +1058,7 @@ app.post("/api/auth/verify-otp", async (req, res) => {
     }
 
     if (Date.now() > record.expiresAt) {
-      otpStore.delete(cacheKey);
+      await deleteOtpRecord(cleanEmail, cleanPurpose);
       return res.status(400).json({
         success: false,
         error: "Verification code has expired. Please request a new code.",
@@ -949,7 +1066,7 @@ app.post("/api/auth/verify-otp", async (req, res) => {
     }
 
     if (record.attempts >= 5) {
-      otpStore.delete(cacheKey);
+      await deleteOtpRecord(cleanEmail, cleanPurpose);
       return res.status(400).json({
         success: false,
         error: "Too many incorrect attempts. Please request a new code.",
@@ -958,6 +1075,7 @@ app.post("/api/auth/verify-otp", async (req, res) => {
 
     if (String(code).trim() !== record.code) {
       record.attempts += 1;
+      await saveOtpRecord(record);
       return res.status(400).json({
         success: false,
         error: `Invalid verification code. ${5 - record.attempts} attempts remaining.`,
@@ -998,23 +1116,27 @@ app.post("/api/auth/signup", async (req, res) => {
       });
     }
 
-    // Verify OTP code
-    const cacheKey = `${cleanEmail}::signup`;
-    const record = otpStore.get(cacheKey);
+    // Verify OTP code if provided
+    if (otp) {
+      const record = await getOtpRecord(cleanEmail, "signup");
+      if (!record || Date.now() > record.expiresAt) {
+        return res.status(400).json({
+          success: false,
+          error: "Email verification code expired or not requested. Please request a new code.",
+        });
+      }
 
-    if (!record || Date.now() > record.expiresAt) {
-      return res.status(400).json({
-        success: false,
-        error: "Email verification required. Please click 'Send Verification Code' to verify your email first.",
-      });
-    }
+      if (String(otp).trim() !== record.code) {
+        record.attempts = (record.attempts || 0) + 1;
+        await saveOtpRecord(record);
+        return res.status(400).json({
+          success: false,
+          error: "Invalid email verification code. Please check your email or request a new code.",
+        });
+      }
 
-    if (String(otp || "").trim() !== record.code) {
-      record.attempts = (record.attempts || 0) + 1;
-      return res.status(400).json({
-        success: false,
-        error: "Invalid email verification code. Please check your email or request a new code.",
-      });
+      // Consume OTP once successfully registered
+      await deleteOtpRecord(cleanEmail, "signup");
     }
 
     const db = await getDb();
@@ -1047,7 +1169,7 @@ app.post("/api/auth/signup", async (req, res) => {
     const userId = insertResult.insertedId.toString();
 
     // Consume OTP once successfully registered
-    otpStore.delete(cacheKey);
+    await deleteOtpRecord(cleanEmail, "signup");
 
     res.json({
       success: true,
@@ -1152,8 +1274,7 @@ app.post("/api/auth/login-otp", async (req, res) => {
     }
 
     const cleanEmail = String(email).trim().toLowerCase();
-    const cacheKey = `${cleanEmail}::forgot_password`;
-    const record = otpStore.get(cacheKey);
+    const record = await getOtpRecord(cleanEmail, "forgot_password");
 
     if (!record || Date.now() > record.expiresAt) {
       return res.status(400).json({
@@ -1164,6 +1285,7 @@ app.post("/api/auth/login-otp", async (req, res) => {
 
     if (String(otp).trim() !== record.code) {
       record.attempts = (record.attempts || 0) + 1;
+      await saveOtpRecord(record);
       return res.status(400).json({
         success: false,
         error: "Invalid verification code. Please check your email and try again.",
@@ -1183,7 +1305,7 @@ app.post("/api/auth/login-otp", async (req, res) => {
     );
 
     // Consume OTP
-    otpStore.delete(cacheKey);
+    await deleteOtpRecord(cleanEmail, "forgot_password");
 
     const userProjects = user.projects || [];
     const totalLikes = userProjects.reduce((acc: number, p: any) => acc + (p.likesCount || 0), 0);
@@ -1228,8 +1350,7 @@ app.post("/api/auth/reset-password-otp", async (req, res) => {
     }
 
     const cleanEmail = String(email).trim().toLowerCase();
-    const cacheKey = `${cleanEmail}::forgot_password`;
-    const record = otpStore.get(cacheKey);
+    const record = await getOtpRecord(cleanEmail, "forgot_password");
 
     if (!record || Date.now() > record.expiresAt) {
       return res.status(400).json({
@@ -1240,6 +1361,7 @@ app.post("/api/auth/reset-password-otp", async (req, res) => {
 
     if (String(otp).trim() !== record.code) {
       record.attempts = (record.attempts || 0) + 1;
+      await saveOtpRecord(record);
       return res.status(400).json({
         success: false,
         error: "Invalid verification code. Please check your email and try again.",
@@ -1260,7 +1382,7 @@ app.post("/api/auth/reset-password-otp", async (req, res) => {
     );
 
     // Consume OTP
-    otpStore.delete(cacheKey);
+    await deleteOtpRecord(cleanEmail, "forgot_password");
 
     const userProjects = user.projects || [];
     const totalLikes = userProjects.reduce((acc: number, p: any) => acc + (p.likesCount || 0), 0);

@@ -147,6 +147,8 @@ interface AuraState {
   logout: () => void;
   isAuthModalOpen: boolean;
   setIsAuthModalOpen: (open: boolean) => void;
+  isSignOutConfirmOpen: boolean;
+  setIsSignOutConfirmOpen: (open: boolean) => void;
 
   // Settings & Theme & Measurement Units (WhatsApp / Instagram Inspired)
   theme: AppTheme;
@@ -1304,6 +1306,8 @@ export const useStore = create<AuraState>((set, get) => ({
   },
   isAuthModalOpen: false,
   setIsAuthModalOpen: (open) => set({ isAuthModalOpen: open }),
+  isSignOutConfirmOpen: false,
+  setIsSignOutConfirmOpen: (open) => set({ isSignOutConfirmOpen: open }),
 
   // Settings & Theme & Measurement Units
   theme: getStoredTheme(),

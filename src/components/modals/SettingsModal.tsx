@@ -49,6 +49,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose })
     roomLength,
     currentUser,
     logout,
+    setIsSignOutConfirmOpen,
     privacySettings,
     updatePrivacySettings,
     notificationSettings,
@@ -827,7 +828,9 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose })
                       </div>
                     </div>
                     <button
-                      onClick={logout}
+                      id="settings-account-logout-btn"
+                      type="button"
+                      onClick={() => setIsSignOutConfirmOpen(true)}
                       className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-red-500/30 bg-red-500/10 hover:bg-red-500/20 text-red-400 text-xs transition-colors"
                     >
                       <LogOut className="w-3.5 h-3.5" />

@@ -68,6 +68,7 @@ export const Navbar: React.FC<NavbarProps> = ({
     currentUser,
     setIsAuthModalOpen,
     logout,
+    setIsSignOutConfirmOpen,
     setIsSettingsModalOpen,
     openPublicProfileTab,
   } = useStore();
@@ -555,7 +556,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                       id="user-menu-logout-btn"
                       onClick={() => {
                         setIsUserMenuOpen(false);
-                        logout();
+                        setIsSignOutConfirmOpen(true);
                       }}
                       className="w-full px-3 py-2 text-left text-xs rounded-lg hover:bg-red-950/40 text-stone-300 hover:text-red-300 flex items-center gap-2 transition-colors"
                     >

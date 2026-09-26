@@ -13,7 +13,29 @@ dotenv.config();
 const PORT = 3000;
 const app = express();
 
+app.use((req: any, res, next) => {
+  if (typeof req.body === "string" && req.body.trim().startsWith("{")) {
+    try {
+      req.body = JSON.parse(req.body);
+    } catch {}
+  }
+  if (req.body && typeof req.body === "object") {
+    req._body = true;
+  }
+  next();
+});
 app.use(express.json({ limit: "10mb" }));
+app.use(express.urlencoded({ extended: true, limit: "10mb" }));
+
+// Health check endpoint for Vercel and API reachability
+app.get(["/api", "/api/health", "/api/status"], (req, res) => {
+  res.json({
+    status: "ok",
+    app: "AuraSpace",
+    timestamp: new Date().toISOString(),
+    environment: process.env.VERCEL ? "vercel_serverless" : "local",
+  });
+});
 
 // Password hashing helper
 function hashPassword(password: string): string {
@@ -828,7 +850,7 @@ app.get("/api/health", async (req, res) => {
 // Send OTP to email for signup or password recovery
 app.post("/api/auth/send-otp", async (req, res) => {
   try {
-    const { email, purpose } = req.body;
+    const { email, purpose } = req.body || {};
     if (!email || !isValidEmail(email)) {
       return res.status(400).json({
         success: false,
@@ -901,7 +923,7 @@ app.post("/api/auth/send-otp", async (req, res) => {
 // Verify OTP
 app.post("/api/auth/verify-otp", async (req, res) => {
   try {
-    const { email, code, purpose } = req.body;
+    const { email, code, purpose } = req.body || {};
     if (!email || !code) {
       return res.status(400).json({ success: false, error: "Email and verification code are required." });
     }
@@ -950,7 +972,7 @@ app.post("/api/auth/verify-otp", async (req, res) => {
 
 app.post("/api/auth/signup", async (req, res) => {
   try {
-    const { name, email, password, otp } = req.body;
+    const { name, email, password, otp } = req.body || {};
 
     if (!email || !password || !name) {
       return res.status(400).json({
@@ -1054,7 +1076,7 @@ app.post("/api/auth/signup", async (req, res) => {
 
 app.post("/api/auth/login", async (req, res) => {
   try {
-    const { email, password } = req.body;
+    const { email, password } = req.body || {};
 
     if (!email || !password) {
       return res.status(400).json({
@@ -1124,7 +1146,7 @@ app.post("/api/auth/login", async (req, res) => {
 // Instant login via OTP for forgot password
 app.post("/api/auth/login-otp", async (req, res) => {
   try {
-    const { email, otp } = req.body;
+    const { email, otp } = req.body || {};
     if (!email || !otp) {
       return res.status(400).json({ success: false, error: "Email and verification code are required." });
     }
@@ -1190,7 +1212,7 @@ app.post("/api/auth/login-otp", async (req, res) => {
 // Reset password via OTP
 app.post("/api/auth/reset-password-otp", async (req, res) => {
   try {
-    const { email, otp, newPassword } = req.body;
+    const { email, otp, newPassword } = req.body || {};
     if (!email || !otp || !newPassword) {
       return res.status(400).json({
         success: false,
@@ -2196,7 +2218,23 @@ async function setupViteOrStatic() {
   });
 }
 
-if (!process.env.VERCEL) {
+const isServerless = Boolean(
+  process.env.VERCEL ||
+  process.env.VERCEL_ENV ||
+  process.env.NOW_REGION ||
+  process.env.AWS_LAMBDA_FUNCTION_NAME ||
+  process.env.LAMBDA_TASK_ROOT
+);
+
+const isDirectRun = Boolean(
+  process.argv[1] && (
+    process.argv[1].endsWith("server.ts") ||
+    process.argv[1].endsWith("server.js") ||
+    process.argv[1].endsWith("server.cjs")
+  )
+);
+
+if (isDirectRun && !isServerless) {
   setupViteOrStatic().catch((err) => {
     console.error("Failed to start server:", err);
   });
